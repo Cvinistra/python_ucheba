@@ -2050,19 +2050,88 @@ async def open_app_command(message: Message):
 # =========================================================
 
 def validate_init_data(init_data: str, bot_token: str) -> dict | None:
+    """Validate Telegram Mini App initData using the documented HMAC scheme.
+
+    We also support clients that include the newer `signature` field by trying
+    both canonical forms: all fields except `hash` (Telegram's bot-token
+    validation) and, when `signature` is present, a compatibility form that
+    excludes both `hash` and `signature`.
+    """
     if not init_data or not bot_token:
         return None
     try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=True))
+        pairs = parse_qsl(init_data, keep_blank_values=True, strict_parsing=True)
     except ValueError:
         return None
-    received_hash = parsed.pop("hash", None)
+
+    data = {}
+    for key, value in pairs:
+        if key in data and key not in {"hash", "signature"}:
+            # Duplicate signed fields are not expected; reject them instead of
+            # silently changing the signed payload.
+            return None
+        data[key] = value
+
+    received_hash = data.pop("hash", None)
     if not received_hash:
         return None
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-    secret_key = hmac.new(bot_token.encode(), b"WebAppData", hashlib.sha256).digest()
-    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return parsed if hmac.compare_digest(computed_hash, received_hash) else None
+
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+
+    def calc(exclude_signature: bool) -> str:
+        check = dict(data)
+        if exclude_signature:
+            check.pop("signature", None)
+        data_check_string = "\n".join(
+            f"{k}={v}" for k, v in sorted(check.items())
+        )
+        return hmac.new(
+            secret_key,
+            data_check_string.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    computed = calc(False)
+    if hmac.compare_digest(computed, received_hash):
+        return data
+
+    if "signature" in data:
+        computed_compat = calc(True)
+        if hmac.compare_digest(computed_compat, received_hash):
+            return data
+
+    return None
+
+
+def validate_init_data_reason(init_data: str, bot_token: str) -> str:
+    if not init_data:
+        return "empty initData"
+    if not bot_token:
+        return "server BOT_TOKEN is empty"
+    try:
+        pairs = parse_qsl(init_data, keep_blank_values=True, strict_parsing=True)
+    except ValueError:
+        return "malformed initData"
+    data = dict(pairs)
+    received_hash = data.pop("hash", None)
+    if not received_hash:
+        return "hash is missing"
+    secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
+    def calc(exclude_signature=False):
+        check = dict(data)
+        if exclude_signature:
+            check.pop("signature", None)
+        check_string = "\n".join(f"{k}={v}" for k, v in sorted(check.items()))
+        return hmac.new(secret_key, check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+    if hmac.compare_digest(calc(False), received_hash):
+        return "valid"
+    if "signature" in data and hmac.compare_digest(calc(True), received_hash):
+        return "valid (signature compatibility mode)"
+    return "HMAC mismatch — check BOT_TOKEN and Mini App bot"
 
 
 def _extract_webapp_user(parsed: dict) -> dict | None:
@@ -2127,6 +2196,27 @@ async def health(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
 
+async def api_debug_init(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    init_data = _request_init_data(request, body)
+    try:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True)) if init_data else {}
+    except Exception:
+        parsed = {}
+    safe_keys = sorted(parsed.keys())
+    return _cors(web.json_response({
+        "has_init_data": bool(init_data),
+        "keys": safe_keys,
+        "has_hash": "hash" in parsed,
+        "has_signature": "signature" in parsed,
+        "has_user": "user" in parsed,
+        "validation": validate_init_data_reason(init_data, TOKEN),
+    }))
+
+
 async def api_course(request: web.Request) -> web.Response:
     return _cors(web.json_response(_build_course_payload()))
 
@@ -2139,7 +2229,9 @@ async def api_me(request: web.Request) -> web.Response:
     parsed = validate_init_data(_request_init_data(request, body), TOKEN)
     user = _extract_webapp_user(parsed or {}) if parsed else None
     if not user or not user.get("id"):
-        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+        init_data = _request_init_data(request, body)
+        reason = validate_init_data_reason(init_data, TOKEN)
+        return _cors(web.json_response({"error": "invalid initData", "reason": reason}, status=401))
 
     uid = int(user["id"])
     await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
@@ -2293,6 +2385,7 @@ async def api_admin(request: web.Request) -> web.Response:
 def build_webapp() -> web.Application:
     app = web.Application()
     app.router.add_get("/health", health)
+    app.router.add_get("/api/debug-init", api_debug_init)
     app.router.add_get("/api/course", api_course)
     app.router.add_post("/api/me", api_me)
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
