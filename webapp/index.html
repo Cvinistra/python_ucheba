@@ -37,6 +37,41 @@ async function adminDetail(id){const b=$(`detail-${id}`);b.innerHTML='<div class
 async function adminSend(id){const text=prompt(`Сообщение пользователю ${id}:`);if(!text)return;try{await api('/api/admin',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',action:'send',user_id:id,text})});alert('Сообщение отправлено')}catch(e){alert(e.message)}}
 function adminHome(){screen('admin');clearInterval(adminTimer);content.innerHTML=header('🛠 Админ-панель',false)+`<div class="stats"><div class="stat"><b id="adminTotalUsers">—</b><span class="small">Пользователей</span></div><div class="stat"><b id="adminTotalViews">—</b><span class="small">Действий</span></div></div><div class="admin-head"><input id="adminSearch" class="search" placeholder="Поиск по ID, имени, username"><button class="primary" id="adminRefresh">↻</button></div><div id="adminUsers" class="users"><div class="spinner">Загрузка…</div></div>`;$('adminRefresh').onclick=loadAdmin;$('adminSearch').oninput=loadAdmin;loadAdmin();adminTimer=setInterval(loadAdmin,10000)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{const t=b.dataset.tab;if(t==='course')courseHome();else if(t==='frameworks')frameworksHome();else if(t==='libraries')librariesHome();else if(t==='mini')miniHome();else if(t==='progress')progressHome();else if(t==='admin'&&state.isAdmin)adminHome()});
-(async()=>{const u=tg?.initDataUnsafe?.user;if(u)$("userName").textContent=u.username?`@${u.username}`:(u.first_name||'Telegram');try{const me=await api('/api/me',{method:'POST',body:JSON.stringify({initData:tg?.initData||''})});state.isAdmin=!!me.is_admin;if(state.isAdmin)$("adminTab").style.display='block';const d=await api('/api/course');state.course=d.course;state.frameworks=d.frameworks;state.libraries=d.libraries;state.miniCodes=d.mini_codes||{};state.total=d.total_topics||0;courseHome()}catch(e){content.innerHTML=`<div class="empty">Не удалось запустить Mini App.<br>${h(e.message)}</div>`}})();
+async function loadApp(){
+  // Telegram's native loading placeholder is hidden immediately.
+  tg?.ready();
+  tg?.expand();
+
+  const u=tg?.initDataUnsafe?.user;
+  if(u) $("userName").textContent=u.username?`@${u.username}`:(u.first_name||"Telegram");
+
+  // Load the public course payload first so the UI never blocks on auth.
+  try{
+    const d=await api("/api/course");
+    state.course=d.course||{};
+    state.frameworks=d.frameworks||{};
+    state.libraries=d.libraries||{};
+    state.miniCodes=d.mini_codes||{};
+    state.total=d.total_topics||0;
+    courseHome();
+  }catch(e){
+    content.innerHTML=`<div class="empty">Не удалось загрузить данные курса.<br>${h(e.message)}<br><br><button class="primary" id="retry">Повторить</button></div>`;
+    $("retry").onclick=loadApp;
+    return;
+  }
+
+  // Authenticate in the background. UI does not depend on this request.
+  if(tg?.initData){
+    try{
+      const me=await api("/api/me",{method:"POST",body:JSON.stringify({initData:tg.initData})});
+      state.isAdmin=!!me.is_admin;
+      if(state.isAdmin) $("adminTab").style.display="block";
+      screen("course");
+    }catch(e){
+      // Keep the Mini App usable. Only user-specific features need auth.
+      console.warn("Telegram authorization failed:",e.message);
+    }
+  }
+}
+loadApp();
 </script>
-</body></html>

@@ -101,7 +101,7 @@ def grid(buttons: list, columns: int = 2) -> list:
 #   Windows:    set BOT_TOKEN=123:ABC       set ADMIN_ID=123456789
 #   Или создать файл .env рядом с ботом и подключить python-dotenv.
 
-TOKEN = os.getenv("BOT_TOKEN", "").strip()
+TOKEN = os.getenv("BOT_TOKEN", "").strip().strip('"').strip("'")
 
 if not TOKEN:
     raise ValueError(
@@ -136,7 +136,8 @@ def normalize_miniapp_url(url: str) -> str:
     if not url:
         return ""
     clean = url.rstrip("/")
-    return clean if clean.lower().endswith(".html") else clean + "/index.html"
+    sep = "&" if "?" in clean else "?"
+    return clean + sep + "v=6" if clean.lower().endswith(".html") else clean + "/index.html?v=6"
 
 MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
 
