@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Python Academy</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f172a);
+      --card: var(--tg-theme-secondary-bg-color, #172033);
+      --text: var(--tg-theme-text-color, #f8fafc);
+      --hint: var(--tg-theme-hint-color, #94a3b8);
+      --accent: var(--tg-theme-button-color, #2481cc);
+      --accentText: var(--tg-theme-button-text-color, #ffffff);
+      --line: rgba(148,163,184,.16);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body { min-height: 100vh; padding-bottom: 88px; }
+    button { font: inherit; }
+    .app { max-width: 760px; margin: 0 auto; padding: 16px 14px 24px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .brand { font-weight:800; font-size:20px; }
+    .user { color:var(--hint); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hero { background:linear-gradient(135deg, var(--card), rgba(36,129,204,.16)); border:1px solid var(--line); border-radius:20px; padding:18px; margin-bottom:16px; }
+    .hero h1 { margin:0 0 8px; font-size:25px; }
+    .hero p { margin:0; color:var(--hint); line-height:1.5; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; cursor:pointer; transition:transform .12s ease, border-color .12s ease; }
+    .card:active { transform:scale(.985); }
+    .card h3 { margin:0 0 7px; font-size:16px; line-height:1.3; }
+    .card p { margin:0; color:var(--hint); font-size:13px; line-height:1.45; }
+    .topic { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; cursor:pointer; min-height:68px; }
+    .topic strong { display:block; font-size:14px; }
+    .topic span { display:block; color:var(--hint); font-size:12px; margin-top:5px; }
+    .section-head { display:flex; gap:10px; align-items:center; margin:8px 0 14px; }
+    .back { border:0; background:var(--card); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; }
+    .section-head h2 { margin:0; font-size:21px; }
+    .lesson { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; }
+    .lesson img { width:100%; max-height:220px; object-fit:contain; background:#fff; border-radius:14px; margin-bottom:14px; }
+    .lesson-body { line-height:1.65; font-size:15px; overflow-wrap:anywhere; }
+    .lesson-body code { display:block; white-space:pre-wrap; overflow:auto; background:rgba(0,0,0,.22); border-radius:12px; padding:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; line-height:1.45; }
+    .action { display:inline-flex; align-items:center; justify-content:center; margin-top:14px; background:var(--accent); color:var(--accentText); border:0; padding:11px 14px; border-radius:12px; text-decoration:none; cursor:pointer; }
+    .progress-wrap { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; }
+    .bar { height:12px; background:rgba(148,163,184,.18); border-radius:999px; overflow:hidden; margin:12px 0; }
+    .fill { height:100%; background:var(--accent); border-radius:999px; transition:width .2s ease; }
+    .muted { color:var(--hint); }
+    .empty { padding:26px 8px; text-align:center; color:var(--hint); }
+    .spinner { padding:30px; text-align:center; color:var(--hint); }
+    .bottom { position:fixed; left:0; right:0; bottom:0; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); background:color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter:blur(14px); border-top:1px solid var(--line); z-index:20; }
+    .tabs { max-width:760px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+    .tab { border:0; background:transparent; color:var(--hint); padding:9px 4px; border-radius:12px; cursor:pointer; font-size:11px; }
+    .tab.active { background:var(--card); color:var(--text); }
+    .tab b { display:block; font-size:18px; margin-bottom:2px; }
+    @media (max-width:520px) {
+      .grid { grid-template-columns:1fr; }
+      .hero h1 { font-size:22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="brand">🐍 Python Academy</div>
+      <div class="user" id="userName">Telegram</div>
+    </div>
+    <main id="content"><div class="spinner">Загрузка курса…</div></main>
+  </div>
+
+  <div class="bottom">
+    <div class="tabs">
+      <button class="tab" data-tab="course"><b>📚</b>Курс</button>
+      <button class="tab" data-tab="frameworks"><b>🧩</b>Фреймворки</button>
+      <button class="tab" data-tab="libraries"><b>📦</b>Библиотеки</button>
+      <button class="tab" data-tab="progress"><b>📊</b>Прогресс</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
+
+    const state = {
+      course: {},
+      frameworks: {},
+      libraries: {},
+      total: 0,
+      screen: { name: 'course', section: null, topicIndex: null, itemType: null, itemKey: null }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const content = $('content');
+
+    async function api(path, options = {}) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      try {
+        const r = await fetch(path, {
+          ...options,
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        return data;
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          throw new Error('Сервер не ответил за 12 секунд');
+        }
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function trackTab(tab) {
+      // Telegram подписывает initData; сервер проверяет подпись и только после
+      // этого пишет users.current_tab и историю views.
+      if (!tg?.initData) return;
+      try {
+        await api('/api/tab', {
+          method: 'POST',
+          body: JSON.stringify({ initData: tg.initData, tab: String(tab).slice(0, 200) })
+        });
+      } catch (e) {
+        console.warn('Не удалось записать вкладку:', e.message);
+      }
+    }
+
+    function h(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function setActiveTab(name) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+    }
+
+    function header(title, back = null) {
+      return `<div class="section-head">${back ? `<button class="back" id="backBtn">← Назад</button>` : ''}<h2>${title}</h2></div>`;
+    }
+
+    function setScreen(screen, trackedTab) {
+      state.screen = screen;
+      setActiveTab(trackedTab);
+      trackTab(trackedTab);
+    }
+
+    function courseHome() {
+      setScreen({name:'course', section:null, topicIndex:null, itemType:null, itemKey:null}, 'course');
+      const sections = Object.entries(state.course);
+      content.innerHTML = `
+        <section class="hero">
+          <h1>📚 Курс Python</h1>
+          <p>${sections.length} разделов и ${state.total} тем. Открывай раздел, изучай тему и переходи дальше по курсу.</p>
+        </section>
+        <div class="grid">
+          ${sections.map(([n, s]) => `<div class="card" data-section="${n}"><h3>${h(s.title)}</h3><p>${s.topics.length} тем</p></div>`).join('')}
+        </div>`;
+      document.querySelectorAll('[data-section]').forEach(el => el.onclick = () => openSection(Number(el.dataset.section)));
+    }
+
+    function openSection(sectionNumber) {
+      const s = state.course[String(sectionNumber)];
+      if (!s) return;
+      setScreen({name:'section', section:sectionNumber, topicIndex:null, itemType:null, itemKey:null}, `section:${sectionNumber}`);
+      content.innerHTML = `
+        ${header(h(s.title), true)}
+        <div class="grid">
+          ${s.topics.map((topic, i) => `<div class="topic" data-topic="${i}"><strong>📖 ${i + 1}. ${h(topic)}</strong><span>Открыть урок</span></div>`).join('')}
+        </div>`;
+      $('backBtn').onclick = courseHome;
+      document.querySelectorAll('[data-topic]').forEach(el => el.onclick = () => openLesson(sectionNumber, Number(el.dataset.topic)));
+    }
+
+    async function openLesson(sectionNumber, topicIndex) {
+      const s = state.course[String(sectionNumber)];
+      const topic = s?.topics?.[topicIndex];
+      if (!topic) return;
+      setScreen({name:'lesson', section:sectionNumber, topicIndex, itemType:null, itemKey:null}, `lesson:${sectionNumber}:${topicIndex}`);
+      content.innerHTML = `<div class="spinner">Загружаем урок «${h(topic)}»…</div>`;
+      try {
+        const data = await api(`/api/lesson/${sectionNumber}/${topicIndex}`);
+        content.innerHTML = `${header(`📖 ${h(data.topic)}`, true)}<article class="lesson"><div class="lesson-body">${data.html}</div></article>`;
+        $('backBtn').onclick = () => openSection(sectionNumber);
+      } catch (e) {
+        content.innerHTML = `<div class="empty">Не удалось загрузить урок.<br><span class="muted">${h(e.message)}</span></div>`;
+      }
+    }
+
+    function frameworksHome() {
+      setScreen({name:'frameworks', section:null, topicIndex:null, itemType:null, itemKey:null}, 'frameworks');
+      const items = Object.entries(state.frameworks);
+      content.innerHTML = `
+        ${header('🧩 Фреймворки')}
+        <div class="grid">
+          ${items.map(([key, d]) => `<div class="card" data-fw="${h(key)}"><h3>${h(d.name)}</h3><p>Открыть описание и команды</p></div>`).join('')}
+        </div>`;
+      document.querySelectorAll('[data-fw]').forEach(el => el.onclick = () => openItem('framework', el.dataset.fw));
+    }
+
+    function librariesHome() {
+      setScreen({name:'libraries', section:null, topicIndex:null, itemType:null, itemKey:null}, 'libraries');
+      const items = Object.entries(state.libraries);
+      content.innerHTML = `
+        ${header('📦 Библиотеки')}
+        <div class="grid">
+          ${items.map(([key, d]) => `<div class="card" data-lib="${h(key)}"><h3>${h(d.name)}</h3><p>Открыть описание и команды</p></div>`).join('')}
+        </div>`;
+      document.querySelectorAll('[data-lib]').forEach(el => el.onclick = () => openItem('library', el.dataset.lib));
+    }
+
+    function openItem(type, key) {
+      const source = type === 'framework' ? state.frameworks : state.libraries;
+      const item = source[key];
+      if (!item) return;
+      const tab = `${type}:${key}`;
+      setScreen({name:type, section:null, topicIndex:null, itemType:type, itemKey:key}, tab);
+      content.innerHTML = `
+        ${header(h(item.name), true)}
+        <article class="lesson">
+          ${item.logo ? `<img src="${h(item.logo)}" alt="${h(item.name)}">` : ''}
+          <div class="lesson-body">${item.desc}</div>
+          ${item.url ? `<a class="action" href="${h(item.url)}" target="_blank" rel="noopener">🔗 Официальный сайт</a>` : ''}
+        </article>`;
+      $('backBtn').onclick = type === 'framework' ? frameworksHome : librariesHome;
+    }
+
+    async function progressHome() {
+      setScreen({name:'progress', section:null, topicIndex:null, itemType:null, itemKey:null}, 'progress');
+      content.innerHTML = '<div class="spinner">Считаем прогресс…</div>';
+      try {
+        const data = await api('/api/progress', { method:'POST', body:JSON.stringify({ initData: tg?.initData || '' }) });
+        const pct = data.total ? Math.round(data.done / data.total * 100) : 0;
+        content.innerHTML = `
+          ${header('📊 Мой прогресс')}
+          <section class="progress-wrap">
+            <div><strong>Пройдено ${data.done} из ${data.total} тем</strong></div>
+            <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+            <div class="muted">${pct}% курса отмечено просмотренными темами.</div>
+          </section>`;
+      } catch (e) {
+        content.innerHTML = `<div class="empty">Прогресс доступен внутри Telegram.<br><span class="muted">${h(e.message)}</span></div>`;
+      }
+    }
+
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        if (tab === 'course') courseHome();
+        else if (tab === 'frameworks') frameworksHome();
+        else if (tab === 'libraries') librariesHome();
+        else if (tab === 'progress') progressHome();
+        tg?.HapticFeedback?.impactOccurred('light');
+      });
+    });
+
+    async function init() {
+      const user = tg?.initDataUnsafe?.user;
+      if (user) $('userName').textContent = user.username ? `@${user.username}` : (user.first_name || 'Telegram');
+      try {
+        const data = await api('/api/course');
+        state.course = data.course;
+        state.frameworks = data.frameworks;
+        state.libraries = data.libraries;
+        state.total = data.total_topics || 0;
+        courseHome();
+      } catch (e) {
+        content.innerHTML = `<div class="empty">Не удалось загрузить курс.<br><span class="muted">${h(e.message)}</span></div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
