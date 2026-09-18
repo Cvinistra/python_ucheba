@@ -132,6 +132,14 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "") or "0")
 
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
+def normalize_miniapp_url(url: str) -> str:
+    if not url:
+        return ""
+    clean = url.rstrip("/")
+    return clean if clean.lower().endswith(".html") else clean + "/index.html"
+
+MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
+
 # Локальный веб-сервер, который раздаёт файлы мини-приложения (./webapp)
 # и принимает от него запросы (курс, прогресс, текущая вкладка).
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
@@ -1164,6 +1172,55 @@ for _key, _slug in _REAL_LIBRARY_LOGOS.items():
 
 
 # =========================================================
+# МИНИ-КОДЫ — короткие готовые проекты
+# =========================================================
+
+MINI_CODES = {
+    "calculator": {
+        "title": "🧮 Калькулятор",
+        "category": "Для новичка",
+        "description": "Простой калькулятор: ввод двух чисел и выбор действия.",
+        "code": "a = float(input(\"Первое число: \"))\noperator = input(\"Действие (+ - * /): \" )\nb = float(input(\"Второе число: \"))\n\nif operator == \"+\":\n    print(a + b)\nelif operator == \"-\":\n    print(a - b)\nelif operator == \"*\":\n    print(a * b)\nelif operator == \"/\":\n    if b == 0:\n        print(\"На ноль делить нельзя\")\n    else:\n        print(a / b)\nelse:\n    print(\"Неизвестное действие\")",
+        "result": "Введи 5, затем +, затем 7 → 12",
+    },
+    "turtle_square": {
+        "title": "🐢 Черепаха: квадрат",
+        "category": "Turtle",
+        "description": "Рисует квадрат с помощью библиотеки turtle.",
+        "code": "import turtle\n\npen = turtle.Turtle()\nfor _ in range(4):\n    pen.forward(120)\n    pen.right(90)\n\nturtle.done()",
+        "result": "Откроется окно с нарисованным квадратом.",
+    },
+    "turtle_spiral": {
+        "title": "🐢 Черепаха: спираль",
+        "category": "Turtle",
+        "description": "Постепенно увеличивает длину шага и рисует геометрическую спираль.",
+        "code": "import turtle\n\npen = turtle.Turtle()\nfor size in range(10, 180, 8):\n    pen.forward(size)\n    pen.right(91)\n\nturtle.done()",
+        "result": "Откроется окно с геометрической спиралью.",
+    },
+    "guess_number": {
+        "title": "🎯 Угадай число",
+        "category": "Игра",
+        "description": "Компьютер загадывает число от 1 до 100, а игрок пытается его угадать.",
+        "code": "import random\n\nsecret = random.randint(1, 100)\n\nwhile True:\n    guess = int(input(\"Твоя догадка: \"))\n    if guess < secret:\n        print(\"Больше\")\n    elif guess > secret:\n        print(\"Меньше\")\n    else:\n        print(\"🎉 Угадал!\")\n        break",
+        "result": "После каждой попытки программа подсказывает: больше или меньше.",
+    },
+    "dice": {
+        "title": "🎲 Бросок кубика",
+        "category": "Мини-игра",
+        "description": "Показывает случайное число от 1 до 6.",
+        "code": "import random\n\nroll = random.randint(1, 6)\nprint(f\"Выпало: {roll}\")",
+        "result": "Например: Выпало: 4",
+    },
+    "todo": {
+        "title": "✅ Мини To-Do",
+        "category": "Списки",
+        "description": "Маленький менеджер задач: добавить, посмотреть и удалить задачу.",
+        "code": "tasks = []\n\nwhile True:\n    command = input(\"add/list/done/exit: \" ).strip()\n\n    if command == \"add\":\n        tasks.append(input(\"Задача: \"))\n    elif command == \"list\":\n        for i, task in enumerate(tasks, 1):\n            print(i, task)\n    elif command == \"done\":\n        index = int(input(\"Номер задачи: \")) - 1\n        if 0 <= index < len(tasks):\n            tasks.pop(index)\n    elif command == \"exit\":\n        break",
+        "result": "Получается небольшой консольный менеджер задач.",
+    },
+}
+
+# =========================================================
 # ГЛАВНОЕ МЕНЮ (кнопки по 2 в ряд)
 # =========================================================
 
@@ -1192,7 +1249,7 @@ def main_menu():
         rows.append([
             InlineKeyboardButton(
                 text="🚀 Открыть Mini App",
-                web_app=WebAppInfo(url=MINIAPP_URL),
+                web_app=WebAppInfo(url=MINIAPP_LAUNCH_URL),
             )
         ])
 
@@ -1981,7 +2038,7 @@ async def open_app_command(message: Message):
             inline_keyboard=[[
                 InlineKeyboardButton(
                     text="🚀 Открыть Mini App",
-                    web_app=WebAppInfo(url=MINIAPP_URL),
+                    web_app=WebAppInfo(url=MINIAPP_LAUNCH_URL),
                 )
             ]]
         ),
@@ -1991,38 +2048,24 @@ async def open_app_command(message: Message):
 # =========================================================
 # WEB APP: проверка подлинности initData
 # =========================================================
-#
-# Мини-приложение при каждом запросе к нашему серверу передаёт initData —
-# строку, которую Telegram подписывает своим ключом на основе токена бота.
-# Проверка ниже — стандартная схема из документации Telegram
-# (https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app),
-# она нужна, чтобы никто не мог прислать серверу чужой user_id.
 
 def validate_init_data(init_data: str, bot_token: str) -> dict | None:
-    """Возвращает распарсенные поля initData, если подпись верна, иначе None."""
     if not init_data or not bot_token:
         return None
     try:
         parsed = dict(parse_qsl(init_data, strict_parsing=True))
     except ValueError:
         return None
-
     received_hash = parsed.pop("hash", None)
     if not received_hash:
         return None
-
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
     secret_key = hmac.new(bot_token.encode(), b"WebAppData", hashlib.sha256).digest()
     computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-
-    if not hmac.compare_digest(computed_hash, received_hash):
-        return None
-
-    return parsed
+    return parsed if hmac.compare_digest(computed_hash, received_hash) else None
 
 
 def _extract_webapp_user(parsed: dict) -> dict | None:
-    """Достаёт объект user из уже провалидированного initData."""
     raw_user = parsed.get("user")
     if not raw_user:
         return None
@@ -2032,21 +2075,46 @@ def _extract_webapp_user(parsed: dict) -> dict | None:
         return None
 
 
-# =========================================================
-# WEB APP: HTTP API для файлов мини-приложения (./webapp)
-# =========================================================
-#
-# Эндпоинты:
-#   GET  /api/course            — структура курса/фреймворков/библиотек
-#   GET  /api/lesson/{s}/{i}    — текст конкретного урока (готовый HTML)
-#   POST /api/progress          — сколько тем уже пройдено (нужен initData)
-#   POST /api/tab               — "я сейчас на вкладке X" (нужен initData);
-#                                  именно этот эндпоинт пишет current_tab
-#                                  в таблицу users рядом с пользователем.
+def _build_course_payload() -> dict:
+    return {
+        "course": {
+            str(number): {"title": section["title"], "topics": section["topics"]}
+            for number, section in COURSE.items()
+        },
+        "frameworks": {
+            key: {
+                "name": data["name"],
+                "logo": data["logo"],
+                "url": data.get("url", ""),
+                "desc": data["desc"],
+                "commands": data.get("commands", []),
+            }
+            for key, data in FRAMEWORKS.items()
+        },
+        "libraries": {
+            key: {
+                "name": data["name"],
+                "logo": data["logo"],
+                "url": data.get("url", ""),
+                "desc": data["desc"],
+                "commands": data.get("commands", []),
+            }
+            for key, data in LIBRARIES.items()
+        },
+        "mini_codes": MINI_CODES,
+        "total_topics": TOTAL_TOPICS,
+    }
+
+
+def _request_init_data(request: web.Request, body: dict | None = None) -> str:
+    if body is not None:
+        return str(body.get("initData", ""))
+    return request.headers.get("X-Telegram-Init-Data", "")
+
 
 def _cors(response: web.Response) -> web.Response:
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
@@ -2060,32 +2128,25 @@ async def health(request: web.Request) -> web.Response:
 
 
 async def api_course(request: web.Request) -> web.Response:
-    payload = {
-        "course": {
-            str(number): {"title": section["title"], "topics": section["topics"]}
-            for number, section in COURSE.items()
-        },
-        "frameworks": {
-            key: {
-                "name": data["name"],
-                "logo": data["logo"],
-                "url": data.get("url", ""),
-                "desc": data["desc"],
-            }
-            for key, data in FRAMEWORKS.items()
-        },
-        "libraries": {
-            key: {
-                "name": data["name"],
-                "logo": data["logo"],
-                "url": data.get("url", ""),
-                "desc": data["desc"],
-            }
-            for key, data in LIBRARIES.items()
-        },
-        "total_topics": TOTAL_TOPICS,
-    }
-    return _cors(web.json_response(payload))
+    return _cors(web.json_response(_build_course_payload()))
+
+
+async def api_me(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    parsed = validate_init_data(_request_init_data(request, body), TOKEN)
+    user = _extract_webapp_user(parsed or {}) if parsed else None
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+
+    uid = int(user["id"])
+    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+    return _cors(web.json_response({
+        "user": user,
+        "is_admin": ADMIN_ID != 0 and uid == ADMIN_ID,
+    }))
 
 
 async def api_lesson(request: web.Request) -> web.Response:
@@ -2097,22 +2158,25 @@ async def api_lesson(request: web.Request) -> web.Response:
         return _cors(web.json_response({"error": "not found"}, status=404))
 
     text = get_topic_text(section_number, topic)
+
+    # Уроки из Mini App учитываются в views как topic.
+    parsed = validate_init_data(_request_init_data(request), TOKEN)
+    user = _extract_webapp_user(parsed or {}) if parsed else None
+    if user and user.get("id"):
+        uid = int(user["id"])
+        await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+        await log_view(uid, "topic", f"{section_number}:{topic}")
+
     return _cors(web.json_response({"topic": topic, "html": text}))
 
 
-async def _read_webapp_user(request: web.Request) -> tuple[dict | None, dict]:
-    """Общая часть для /api/progress и /api/tab: парсит тело запроса и
-    проверяет initData. Возвращает (user_dict, body) или (None, body)."""
+async def _read_webapp_user(request: web.Request):
     try:
         body = await request.json()
     except Exception:
-        return None, {}
-
-    parsed = validate_init_data(body.get("initData", ""), TOKEN)
-    if not parsed:
-        return None, body
-
-    user = _extract_webapp_user(parsed)
+        body = {}
+    parsed = validate_init_data(_request_init_data(request, body), TOKEN)
+    user = _extract_webapp_user(parsed or {}) if parsed else None
     return user, body
 
 
@@ -2121,55 +2185,135 @@ async def api_progress(request: web.Request) -> web.Response:
     if not user or not user.get("id"):
         return _cors(web.json_response({"error": "invalid initData"}, status=401))
 
-    user_id = user["id"]
-    await touch_user_from_webapp(user_id, user.get("username", ""), user.get("first_name", ""))
-    done = await asyncio.to_thread(_count_done_topics_sync, user_id)
-
+    uid = int(user["id"])
+    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+    done = await asyncio.to_thread(_count_done_topics_sync, uid)
     return _cors(web.json_response({"done": done, "total": TOTAL_TOPICS}))
 
 
 async def api_tab(request: web.Request) -> web.Response:
-    """Мини-приложение сообщает, какая вкладка сейчас открыта.
-
-    Пишем это через тот же log_view(), которым пользуется сам бот —
-    он одной записью обновляет и историю просмотров (views), и колонку
-    current_tab прямо в строке пользователя (users)."""
     user, body = await _read_webapp_user(request)
     if not user or not user.get("id"):
         return _cors(web.json_response({"error": "invalid initData"}, status=401))
 
-    user_id = user["id"]
+    uid = int(user["id"])
     tab = str(body.get("tab", ""))[:200] or "unknown"
-
-    await touch_user_from_webapp(user_id, user.get("username", ""), user.get("first_name", ""))
-    await log_view(user_id, "webapp", tab)
-
+    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+    await log_view(uid, "webapp", tab)
     return _cors(web.json_response({"ok": True}))
+
+
+def _admin_users_sync(query: str = "", limit: int = 200):
+    query = query.strip().lower()
+    limit = max(1, min(limit, 200))
+    with db_connect() as conn:
+        if query:
+            rows = conn.execute(
+                "SELECT u.user_id,u.username,u.first_name,u.last_seen,u.current_tab,u.current_tab_at,COUNT(v.id) "
+                "FROM users u LEFT JOIN views v ON v.user_id=u.user_id "
+                "WHERE LOWER(COALESCE(u.username,'')) LIKE ? OR LOWER(COALESCE(u.first_name,'')) LIKE ? "
+                "OR CAST(u.user_id AS TEXT) LIKE ? GROUP BY u.user_id "
+                "ORDER BY COALESCE(u.last_seen,'') DESC LIMIT ?",
+                (f"%{query}%", f"%{query}%", f"%{query}%", limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT u.user_id,u.username,u.first_name,u.last_seen,u.current_tab,u.current_tab_at,COUNT(v.id) "
+                "FROM users u LEFT JOIN views v ON v.user_id=u.user_id "
+                "GROUP BY u.user_id ORDER BY COALESCE(u.last_seen,'') DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+    keys = ["user_id", "username", "first_name", "last_seen", "current_tab", "current_tab_at", "views_count"]
+    return [dict(zip(keys, row)) for row in rows]
+
+
+def _admin_user_views_sync(user_id: int, limit: int = 50):
+    with db_connect() as conn:
+        user = conn.execute(
+            "SELECT user_id,username,first_name,last_seen,current_tab,current_tab_at FROM users WHERE user_id=?",
+            (user_id,),
+        ).fetchone()
+        views = conn.execute(
+            "SELECT kind,title,viewed_at FROM views WHERE user_id=? ORDER BY id DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+    return user, views
+
+
+async def api_admin(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or ADMIN_ID == 0 or int(user.get("id", 0)) != ADMIN_ID:
+        return _cors(web.json_response({"error": "forbidden"}, status=403))
+
+    action = str(body.get("action", "users"))
+
+    if action == "users":
+        users = await asyncio.to_thread(_admin_users_sync, str(body.get("query", ""))[:80], 200)
+        with db_connect() as conn:
+            total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            total_views = conn.execute("SELECT COUNT(*) FROM views").fetchone()[0]
+        return _cors(web.json_response({
+            "users": users,
+            "total_users": total_users,
+            "total_views": total_views,
+        }))
+
+    if action == "user":
+        try:
+            user_id = int(body.get("user_id"))
+        except (TypeError, ValueError):
+            return _cors(web.json_response({"error": "invalid user_id"}, status=400))
+        raw_user, raw_views = await asyncio.to_thread(_admin_user_views_sync, user_id)
+        if not raw_user:
+            return _cors(web.json_response({"error": "user not found"}, status=404))
+        keys = ["user_id", "username", "first_name", "last_seen", "current_tab", "current_tab_at"]
+        return _cors(web.json_response({
+            "user": dict(zip(keys, raw_user)),
+            "views": [dict(zip(["kind", "title", "viewed_at"], row)) for row in raw_views],
+        }))
+
+    if action == "send":
+        try:
+            user_id = int(body.get("user_id"))
+        except (TypeError, ValueError):
+            return _cors(web.json_response({"error": "invalid user_id"}, status=400))
+        message_text = str(body.get("text", ""))[:4000].strip()
+        if not message_text:
+            return _cors(web.json_response({"error": "empty message"}, status=400))
+        try:
+            await bot.send_message(user_id, message_text, parse_mode=None)
+        except Exception as exc:
+            return _cors(web.json_response({"error": str(exc)}, status=400))
+        return _cors(web.json_response({"ok": True}))
+
+    return _cors(web.json_response({"error": "unknown action"}, status=400))
 
 
 def build_webapp() -> web.Application:
     app = web.Application()
     app.router.add_get("/health", health)
     app.router.add_get("/api/course", api_course)
+    app.router.add_post("/api/me", api_me)
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
     app.router.add_post("/api/progress", api_progress)
     app.router.add_post("/api/tab", api_tab)
-    for path in ("/api/course", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab"):
+    app.router.add_post("/api/admin", api_admin)
+
+    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/admin"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):
-        # Доступны оба адреса: / и /webapp/. Это позволяет указать
-        # MINIAPP_URL как https://domain/ или https://domain/webapp/.
-        app.router.add_static("/webapp", WEBAPP_DIR, show_index=True)
-        app.router.add_static("/", WEBAPP_DIR, show_index=True)
-    else:
-        log.warning(
-            "Папка мини-приложения %s не найдена — статика отдаваться не будет "
-            "(API всё равно работает).", WEBAPP_DIR,
-        )
+        async def index(request: web.Request) -> web.Response:
+            return web.FileResponse(os.path.join(WEBAPP_DIR, "index.html"))
+
+        # /, /index.html и /webapp/ открывают само приложение, а не Index of /.
+        app.router.add_get("/", index)
+        app.router.add_get("/index.html", index)
+        app.router.add_get("/webapp/", index)
+        app.router.add_get("/webapp/index.html", index)
 
     return app
-
 
 # =========================================================
 # ЗАПУСК
@@ -2193,7 +2337,7 @@ async def main():
         # для ВСЕХ пользователей бота (можно сузить через chat_id).
         try:
             await bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(text="Курс", web_app=WebAppInfo(url=MINIAPP_URL))
+                menu_button=MenuButtonWebApp(text="Курс", web_app=WebAppInfo(url=MINIAPP_LAUNCH_URL))
             )
         except Exception:
             log.exception("Не удалось установить кнопку меню Mini App")
