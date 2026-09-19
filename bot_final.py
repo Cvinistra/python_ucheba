@@ -1,4 +1,5 @@
 import asyncio
+import ast
 import hashlib
 import hmac
 import html
@@ -145,7 +146,7 @@ def is_admin_user(user_id: int) -> bool:
 # Требования Telegram: адрес обязательно HTTPS (кроме localhost при
 # тестировании через ngrok/аналоги — тогда достаточно https-туннеля).
 
-APP_VERSION = "11.0.0"
+APP_VERSION = "12.0.0"
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
 def normalize_miniapp_url(url: str) -> str:
@@ -153,7 +154,7 @@ def normalize_miniapp_url(url: str) -> str:
         return ""
     clean = url.rstrip("/")
     sep = "&" if "?" in clean else "?"
-    return clean + sep + "v=11" if clean.lower().endswith(".html") else clean + "/index.html?v=11"
+    return clean + sep + "v=12" if clean.lower().endswith(".html") else clean + "/index.html?v=12"
 
 MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
 
@@ -248,6 +249,26 @@ def init_db():
             conn.execute("ALTER TABLE support_messages ADD COLUMN replied_at TEXT")
         if "admin_id" not in support_cols:
             conn.execute("ALTER TABLE support_messages ADD COLUMN admin_id INTEGER")
+
+        for col, definition in (
+            ("language", "TEXT DEFAULT 'ru'"),
+            ("theme", "TEXT DEFAULT 'system'"),
+            ("goal", "TEXT DEFAULT 'general'"),
+        ):
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS favorites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                item_key TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, kind, item_key)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)")
 
         conn.commit()
 
@@ -3083,9 +3104,21 @@ async def api_me(request: web.Request) -> web.Response:
 
     uid = int(user["id"])
     await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+    def _settings():
+        with db_connect() as conn:
+            return conn.execute(
+                "SELECT language,theme,goal FROM users WHERE user_id=?",
+                (uid,),
+            ).fetchone() or ("ru","system","general")
+    settings = await asyncio.to_thread(_settings)
     return _cors(web.json_response({
         "user": user,
         "is_admin": ADMIN_ID != 0 and uid == ADMIN_ID,
+        "settings": {
+            "language": settings[0] or "ru",
+            "theme": settings[1] or "system",
+            "goal": settings[2] or "general",
+        },
     }))
 
 
@@ -3221,6 +3254,238 @@ async def api_support(request: web.Request) -> web.Response:
     )
     await log_view(uid, "support", f"ticket:{ticket_id}")
     return _cors(web.json_response({"ok": True, "ticket_id": ticket_id}))
+
+
+# =========================================================
+# MINI APP V12 API
+# =========================================================
+
+CODE_TRAINER_TASKS = [
+    {
+        "id": "add_numbers",
+        "title": "Функция сложения",
+        "difficulty": "🟢 Начальный",
+        "prompt": "Напиши функцию add(a, b), которая возвращает сумму двух чисел.",
+        "starter": "def add(a, b):\n    # напиши здесь\n    pass",
+        "hint": "Нужны def, два параметра и return a + b.",
+        "required_any": [["def add"], ["return a + b", "return(a + b)"]],
+    },
+    {
+        "id": "even_number",
+        "title": "Проверка чётности",
+        "difficulty": "🟢 Начальный",
+        "prompt": "Напиши функцию is_even(n), возвращающую True для чётного числа.",
+        "starter": "def is_even(n):\n    # напиши здесь\n    pass",
+        "hint": "Используй остаток от деления: n % 2.",
+        "required_any": [["def is_even"], ["% 2"]],
+    },
+    {
+        "id": "list_sum",
+        "title": "Сумма списка",
+        "difficulty": "🟢 Начальный",
+        "prompt": "Напиши функцию list_sum(numbers), которая возвращает сумму элементов списка.",
+        "starter": "def list_sum(numbers):\n    # напиши здесь\n    pass",
+        "hint": "В стандартной библиотеке уже есть sum().",
+        "required_any": [["def list_sum"], ["sum("]],
+    },
+    {
+        "id": "safe_get",
+        "title": "Безопасный dict.get()",
+        "difficulty": "🟡 Средний",
+        "prompt": "Напиши get_age(user), возвращающую age или 0, если ключа нет.",
+        "starter": "def get_age(user):\n    # напиши здесь\n    pass",
+        "hint": "Вспомни dict.get(key, default).",
+        "required_any": [["def get_age"], [".get("]],
+    },
+    {
+        "id": "json_save",
+        "title": "Сохранение JSON",
+        "difficulty": "🟠 Средний",
+        "prompt": "Сохрани словарь в JSON через json.dump().",
+        "starter": "import json\n\ndef save_json(data, filename):\n    # напиши здесь\n    pass",
+        "hint": "Нужен with open(..., encoding='utf-8') и json.dump().",
+        "required_any": [["import json"], ["json.dump"], ["with open("]],
+    },
+    {
+        "id": "api_request",
+        "title": "GET + JSON",
+        "difficulty": "🔴 Продвинутый",
+        "prompt": "Получить JSON через requests.get() и .json().",
+        "starter": "import requests\n\n# напиши здесь",
+        "hint": "Нужны requests.get(...) и .json().",
+        "required_any": [["import requests"], ["requests.get("], [".json()"]],
+    },
+]
+
+def _check_code_task(task_id: str, code: str) -> dict:
+    task = next((x for x in CODE_TRAINER_TASKS if x["id"] == task_id), None)
+    if not task:
+        return {"ok": False, "error": "unknown task"}
+    if not code.strip():
+        return {"ok": False, "passed": False, "message": "Пустой код.", "hint": task["hint"]}
+    try:
+        ast.parse(code)
+    except SyntaxError as exc:
+        return {
+            "ok": True,
+            "passed": False,
+            "message": f"Синтаксическая ошибка: {exc.msg} (строка {exc.lineno})",
+            "hint": "Сначала исправь синтаксис, потом проверь условия задачи.",
+        }
+    missing = []
+    for alternatives in task["required_any"]:
+        if not any(candidate in code for candidate in alternatives):
+            missing.append(alternatives[0])
+    if missing:
+        return {
+            "ok": True,
+            "passed": False,
+            "message": "Код читается, но пока не выполнены все условия задания.",
+            "missing": missing,
+            "hint": task["hint"],
+        }
+    return {
+        "ok": True,
+        "passed": True,
+        "message": "✅ Решение соответствует условиям. Пользовательский код на сервере не выполняется.",
+        "hint": "Попробуй улучшить читаемость или написать второй вариант.",
+    }
+
+async def api_settings(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+    uid = int(user["id"])
+    action = str(body.get("action", "get")).strip().lower()
+
+    if action == "get":
+        def _get():
+            with db_connect() as conn:
+                return conn.execute(
+                    "SELECT language,theme,goal,username,first_name FROM users WHERE user_id=?",
+                    (uid,),
+                ).fetchone()
+        row = await asyncio.to_thread(_get)
+        if not row:
+            return _cors(web.json_response({"language":"ru","theme":"system","goal":"general"}))
+        return _cors(web.json_response({
+            "language": row[0] or "ru",
+            "theme": row[1] or "system",
+            "goal": row[2] or "general",
+            "username": row[3] or "",
+            "first_name": row[4] or "",
+        }))
+
+    language = str(body.get("language", "ru")).lower()
+    theme = str(body.get("theme", "system")).lower()
+    goal = str(body.get("goal", "general")).lower()
+    if language not in {"ru", "en"}: language = "ru"
+    if theme not in {"system", "dark", "light"}: theme = "system"
+    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+
+    def _save():
+        with db_connect() as conn:
+            conn.execute(
+                "UPDATE users SET language=?, theme=?, goal=? WHERE user_id=?",
+                (language, theme, goal[:40], uid),
+            )
+            conn.commit()
+    await asyncio.to_thread(_save)
+    await log_view(uid, "settings", f"{language}:{theme}:{goal}")
+    return _cors(web.json_response({"ok":True,"language":language,"theme":theme,"goal":goal}))
+
+async def api_favorites(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+    uid = int(user["id"])
+    action = str(body.get("action", "list")).lower()
+    if action == "list":
+        def _list():
+            with db_connect() as conn:
+                return conn.execute(
+                    "SELECT kind,item_key FROM favorites WHERE user_id=? ORDER BY id DESC",
+                    (uid,),
+                ).fetchall()
+        rows = await asyncio.to_thread(_list)
+        return _cors(web.json_response({"favorites":[{"kind":r[0],"item_key":r[1]} for r in rows]}))
+    kind = str(body.get("kind",""))[:40]
+    item_key = str(body.get("item_key",""))[:120]
+    if not kind or not item_key:
+        return _cors(web.json_response({"error":"kind and item_key required"},status=400))
+    def _change():
+        now = datetime.now().isoformat(timespec="seconds")
+        with db_connect() as conn:
+            if action == "add":
+                conn.execute(
+                    "INSERT OR IGNORE INTO favorites (user_id,kind,item_key,created_at) VALUES (?,?,?,?)",
+                    (uid,kind,item_key,now)
+                )
+            elif action == "remove":
+                conn.execute(
+                    "DELETE FROM favorites WHERE user_id=? AND kind=? AND item_key=?",
+                    (uid,kind,item_key)
+                )
+            conn.commit()
+    await asyncio.to_thread(_change)
+    await log_view(uid, "favorite", f"{action}:{kind}:{item_key}")
+    return _cors(web.json_response({"ok":True}))
+
+async def api_code_check(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error":"invalid initData"},status=401))
+    result = await asyncio.to_thread(
+        _check_code_task,
+        str(body.get("task_id","")),
+        str(body.get("code",""))[:12000],
+    )
+    await log_view(int(user["id"]), "code_trainer", str(body.get("task_id","")))
+    return _cors(web.json_response(result))
+
+async def api_mentor(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error":"invalid initData"},status=401))
+    query = str(body.get("query","")).strip()[:500]
+    mode = str(body.get("mode","explain")).lower()
+    if not query:
+        return _cors(web.json_response({"answer":"Напиши вопрос про Python, урок, библиотеку или фреймворк.","suggestions":[]}))
+    q_words = [w for w in re.findall(r"[a-zA-Zа-яА-Я0-9_+#.-]{2,}", query.lower())]
+    candidates = []
+    for section_num, section in COURSE.items():
+        for topic in section.get("topics", []):
+            score = sum(1 for w in q_words if w in topic.lower())
+            if score:
+                candidates.append((score,"lesson",str(section_num),topic))
+    for key,item in FRAMEWORKS.items():
+        txt = f"{item.get('name','')} {item.get('desc','')} {' '.join(c[0] for c in item.get('commands',[]))}"
+        score = sum(1 for w in q_words if w in txt.lower())
+        if score:
+            candidates.append((score,"framework",key,item["name"]))
+    for key,item in LIBRARIES.items():
+        txt = f"{item.get('name','')} {item.get('desc','')} {' '.join(c[0] for c in item.get('commands',[]))}"
+        score = sum(1 for w in q_words if w in txt.lower())
+        if score:
+            candidates.append((score,"library",key,item["name"]))
+    candidates.sort(reverse=True)
+    top = candidates[:5]
+    if not top:
+        answer = "Я не нашёл точного совпадения. Попробуй: «циклы», «функции», «Django», «SQLite», «asyncio»."
+    else:
+        title = top[0][3]
+        if mode == "simple":
+            answer = f"Проще: «{title}» — это инструмент или тема, которую лучше сначала понять на одном маленьком примере, а потом закрепить практикой."
+        elif mode == "analogy":
+            answer = f"Аналогия: представь «{title}» как инструмент в наборе разработчика. Сначала определяешь задачу, затем берёшь подходящий инструмент."
+        else:
+            extra = LESSONS_EXTRA.get(title)
+            answer = f"По теме «{title}»: {extra[1]}" if extra else f"Начни с «{title}», затем открой связанную практику."
+    await log_view(int(user["id"]), "mentor", query)
+    return _cors(web.json_response({
+        "answer":answer,
+        "suggestions":[{"kind":kind,"key":key,"title":title} for _,kind,key,title in top],
+    }))
 
 async def api_tab(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
@@ -3367,6 +3632,22 @@ async def api_admin(request: web.Request) -> web.Response:
             return _cors(web.json_response({"error": str(exc)}, status=400))
         return _cors(web.json_response({"ok": True}))
 
+    if action == "analytics":
+        def _analytics():
+            with db_connect() as conn:
+                tabs = conn.execute(
+                    "SELECT COALESCE(current_tab,'—'),COUNT(*) FROM users GROUP BY COALESCE(current_tab,'—') ORDER BY COUNT(*) DESC LIMIT 15"
+                ).fetchall()
+                top = conn.execute(
+                    "SELECT kind,title,COUNT(*) FROM views GROUP BY kind,title ORDER BY COUNT(*) DESC LIMIT 15"
+                ).fetchall()
+            return tabs, top
+        tabs, top = await asyncio.to_thread(_analytics)
+        return _cors(web.json_response({
+            "current_tabs":[{"tab":r[0],"count":r[1]} for r in tabs],
+            "top_views":[{"kind":r[0],"title":r[1],"count":r[2]} for r in top],
+        }))
+
     if action == "support":
         with db_connect() as conn:
             rows = conn.execute(
@@ -3425,8 +3706,12 @@ def build_webapp() -> web.Application:
     app.router.add_post("/api/support", api_support)
     app.router.add_post("/api/quiz", api_quiz_answer)
     app.router.add_post("/api/admin", api_admin)
+    app.router.add_post("/api/settings", api_settings)
+    app.router.add_post("/api/favorites", api_favorites)
+    app.router.add_post("/api/code-check", api_code_check)
+    app.router.add_post("/api/mentor", api_mentor)
 
-    for path in ("/api/version", "/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin"):
+    for path in ("/api/version", "/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin", "/api/settings", "/api/favorites", "/api/code-check", "/api/mentor"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):

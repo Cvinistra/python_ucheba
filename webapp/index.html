@@ -89,13 +89,41 @@ button{cursor:pointer}
 .toast{position:fixed;left:50%;bottom:108px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;z-index:120;display:none;max-width:90%}
 .toast.show{display:block}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.tab{min-width:70px}}
+
+:root{--bg-light:#f5f7fb;--card-light:#ffffff;--text-light:#111827;--hint-light:#64748b;--line-light:rgba(15,23,42,.12)}
+body.light{background:var(--bg-light);color:var(--text-light)}
+body.light .top{background:linear-gradient(var(--bg-light) 85%,transparent)}
+body.light .card,body.light .lesson,body.light .cmd-card,body.light .code-card,body.light .user-card,body.light .stat,body.light .support-card,body.light .ticket,body.light .learn-block,body.light .ghost,body.light .search,body.light .textarea,body.light .modal{background:var(--card-light);color:var(--text-light);border-color:var(--line-light)}
+body.light .user,body.light .small,body.light .muted,body.light .card p{color:var(--hint-light)}
+body.light .bottom{background:rgba(255,255,255,.94)}
+.feature-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.icon-btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:11px;padding:7px 10px}
+.search-wrap{display:flex;gap:8px;margin-bottom:10px}.search-wrap .search{flex:1}
+.result-card{padding:13px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:8px;cursor:pointer}
+.map-node{position:relative;padding:13px 13px 13px 22px;border-left:3px solid var(--accent);margin-left:8px}
+.map-node:before{content:"";position:absolute;left:-8px;top:17px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.goal-card{border:1px solid var(--line);background:var(--card);border-radius:16px;padding:14px;text-align:left;color:var(--text);width:100%}
+.goal-card.active{outline:2px solid var(--accent)}
+.mentor-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.mentor-box{padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+.editor{min-height:220px;width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5;background:rgba(0,0,0,.25);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px;resize:vertical;outline:none}
+body.light .editor{background:#f8fafc;color:#111827}
+.project-stage{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--line)}
+.kpi{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+.setting-row{padding:13px 0;border-bottom:1px solid var(--line)}
+.setting-title{font-weight:800}.setting-desc{font-size:12px;color:var(--hint);margin:5px 0 8px}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="top">
-    <div class="brand">🐍 Python Academy <span class="badge" id="buildVersion">v11</span></div>
-    <div class="user" id="userName">Telegram</div>
+    <div class="brand">🐍 Python Academy <span class="badge" id="buildVersion">v12</span></div>
+    <div class="feature-actions" style="margin:0">
+      <button class="icon-btn" id="searchBtn" title="Поиск">🔎</button>
+      <button class="icon-btn" id="settingsBtn" title="Настройки">⚙️</button>
+      <span class="user" id="userName">Telegram</span>
+    </div>
   </div>
   <main id="content"><div class="spinner">Открываем приложение…</div></main>
 </div>
@@ -107,8 +135,10 @@ button{cursor:pointer}
     <button class="tab" data-tab="frameworks"><b>🧩</b>Фреймворки</button>
     <button class="tab" data-tab="libraries"><b>📦</b>Библиотеки</button>
     <button class="tab" data-tab="practice"><b>🧪</b>Практика</button>
+    <button class="tab" data-tab="mentor"><b>🤖</b>Наставник</button>
     <button class="tab" data-tab="progress"><b>📊</b>Прогресс</button>
     <button class="tab" data-tab="support"><b>🆘</b>Поддержка</button>
+    <button class="tab" data-tab="settings"><b>⚙️</b>Настройки</button>
     <button class="tab" data-tab="admin" id="adminTab" style="display:none"><b>🛠</b>Админ</button>
   </div>
 </div>
@@ -680,6 +710,289 @@ async function loadApp(){
     }catch(e){console.warn("Telegram auth failed:",e.message)}
   }
 }
+
+/* ================= V12 FEATURES ================= */
+const V12_I18N={
+  ru:{learn:"Обучение",course:"Курс",frameworks:"Фреймворки",libraries:"Библиотеки",practice:"Практика",mentor:"Наставник",progress:"Прогресс",support:"Поддержка",settings:"Настройки",admin:"Админ",search:"Поиск",searchPlaceholder:"Найти урок, фреймворк, библиотеку или мини-код…",system:"Системная",dark:"Тёмная",light:"Светлая",saved:"Настройки сохранены"},
+  en:{learn:"Learning",course:"Course",frameworks:"Frameworks",libraries:"Libraries",practice:"Practice",mentor:"Mentor",progress:"Progress",support:"Support",settings:"Settings",admin:"Admin",search:"Search",searchPlaceholder:"Find a lesson, framework, library or mini-code…",system:"System",dark:"Dark",light:"Light",saved:"Settings saved"}
+};
+function vt(k){return (V12_I18N[state.settings?.language]||V12_I18N.ru)[k]||k}
+function v12ApplyTheme(theme){
+  if(theme==="system"){
+    document.body.classList.toggle("light",!!window.matchMedia?.("(prefers-color-scheme: light)")?.matches);
+  }else document.body.classList.toggle("light",theme==="light");
+}
+function v12LoadPrefs(){
+  try{Object.assign(state.settings,JSON.parse(localStorage.getItem("pyacademy_settings")||"{}"))}catch{}
+  state.settings=Object.assign({language:"ru",theme:"system",goal:"general"},state.settings||{});
+  v12ApplyTheme(state.settings.theme);
+  try{state.favorites=JSON.parse(localStorage.getItem("pyacademy_favorites")||"[]")}catch{state.favorites=[]}
+}
+async function v12SavePrefs(){
+  localStorage.setItem("pyacademy_settings",JSON.stringify(state.settings));
+  v12ApplyTheme(state.settings.theme);
+  try{await api("/api/settings",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",...state.settings})})}catch{}
+}
+function v12GoalCards(){
+  const goals=[
+    ["general","🐍","Python с нуля","Сильная база и проекты"],
+    ["web","🌐","Веб-разработка","Django, Flask, FastAPI, API, БД"],
+    ["telegram","🤖","Telegram-боты","aiogram, Mini App, SQLite"],
+    ["data","📊","Data","NumPy, Pandas, анализ"],
+    ["games","🎮","Игры","Логика, pygame, проекты"],
+    ["automation","⚙️","Автоматизация","Файлы, API, полезные скрипты"]
+  ];
+  return `<div class="grid">${goals.map(x=>`<button class="goal-card ${state.settings.goal===x[0]?"active":""}" data-v12goal="${x[0]}"><b>${x[1]} ${h(x[2])}</b><p>${h(x[3])}</p></button>`).join("")}</div>`;
+}
+const V12_PROJECTS=[
+  ["bot","🤖 Telegram-бот","От /start до базы и Mini App",["Создать бота","Команды","Кнопки","SQLite","Состояния","Mini App","Deploy"]],
+  ["web","🌐 Web API","Небольшой серверный проект",["HTTP/JSON","Маршруты","GET/POST","Валидация","SQLite","Тесты","Deploy"]],
+  ["todo","✅ To-Do","Приложение с хранением данных",["CLI","Функции","JSON","Ошибки","Редактирование","Поиск","README"]],
+  ["game","🎮 Мини-игра","Игра от логики до интерфейса",["Правила","Цикл","Состояние","Очки","Ошибки","UI","Полировка"]],
+  ["parser","🌐 API-парсер","Получение, фильтрация и сохранение данных",["requests","JSON","Фильтрация","Сохранение","Ошибки","Отчёт","README"]]
+];
+
+function v12LearningHome(){
+  screen("learn");
+  const goal=state.settings.goal||"general";
+  const priority={web:["webdb","advanced","quality","projects"],telegram:["telegram","async","errors","webdb","projects"],data:["collections","errors","projects"],games:["logic","functions","projects"],automation:["strings","modules","errors","webdb","projects"],general:[]}[goal]||[];
+  const order=priority.length?[...state.learning].sort((a,b)=>(priority.includes(a.id)?0:1)-(priority.includes(b.id)?0:1)):state.learning;
+  content.innerHTML=header("🐍 Обучение: от нуля до профи",false)+
+  `<section class="hero"><h3>🎯 Твоя цель</h3>${v12GoalCards()}<p class="small">Маршрут автоматически перестраивается под выбранную цель.</p></section>
+   <section class="hero"><h3>🗺 Карта обучения</h3>${order.map((s,i)=>`<div class="map-node"><b>${i+1}. ${h(s.title)}</b><div class="small">${h(s.description)}</div></div>`).join("")}</section>
+   <div class="grid">${order.map((s,i)=>`<div class="card clickable" data-v12stage="${i}"><span class="badge">${h(s.level)}</span><h3>${h(s.title)}</h3><p>${h(s.description)}</p><span class="small">${s.modules.length} модуля · открыть →</span></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-v12goal]").forEach(x=>x.onclick=async()=>{state.settings.goal=x.dataset.v12goal;await v12SavePrefs();v12LearningHome()});
+  document.querySelectorAll("[data-v12stage]").forEach(x=>x.onclick=()=>{const s=order[+x.dataset.v12stage];openLearning(state.learning.findIndex(a=>a.id===s.id))});
+}
+
+function v12PracticeShell(active){
+  return `<div class="practice-tabs">
+    <button class="subtab ${active==="tasks"?"active":""}" data-v12practice="tasks">📝 Задания</button>
+    <button class="subtab ${active==="quiz"?"active":""}" data-v12practice="quiz">🧠 Викторина</button>
+    <button class="subtab ${active==="mini"?"active":""}" data-v12practice="mini">💡 Мини-коды</button>
+    <button class="subtab ${active==="trainer"?"active":""}" data-v12practice="trainer">💻 Тренажёр</button>
+    <button class="subtab ${active==="projects"?"active":""}" data-v12practice="projects">🚀 Проекты</button>
+  </div>`;
+}
+function v12PracticeHome(active="tasks"){
+  screen("practice");
+  content.innerHTML=header("🧪 Практика",false)+v12PracticeShell(active)+`<div id="v12PracticeContent"></div>`;
+  document.querySelectorAll("[data-v12practice]").forEach(x=>x.onclick=()=>v12PracticeHome(x.dataset.v12practice));
+  if(active==="tasks")v12RenderTasks();else if(active==="quiz")v12QuizHome();else if(active==="mini")v12MiniHome();else if(active==="trainer")v12TrainerHome();else v12ProjectsHome();
+}
+function v12RenderTasks(){
+  screen("practice:tasks");
+  $("v12PracticeContent").innerHTML=`<section class="hero"><h3>📝 Задания</h3><p>Сначала попробуй сам, затем открывай подсказку и пример.</p></section><div class="grid">${state.tasks.map((t,i)=>`<div class="card clickable" data-v12task="${i}"><span class="badge">${h(t.difficulty)}</span><h3>${h(t.title)}</h3><p>${h(t.prompt)}</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-v12task]").forEach(x=>x.onclick=()=>v12OpenTask(+x.dataset.v12task));
+}
+function v12OpenTask(i){
+  const t0=state.tasks[i];if(!t0)return;screen(`task:${t0.id}`);
+  $("v12PracticeContent").innerHTML=header(t0.title)+`<article class="code-card"><span class="badge">${h(t0.difficulty)}</span><p>${h(t0.prompt)}</p><div class="feedback"><b>💡 Подсказка</b><br>${h(t0.hint)}</div><button class="ghost" id="v12solution">Показать пример</button><div id="v12sol"></div></article>`;
+  $("backBtn").onclick=()=>v12PracticeHome("tasks");
+  $("v12solution").onclick=()=>{$("v12sol").innerHTML=`<pre class="code">${h(t0.solution)}</pre><button class="ghost" id="v12copy">📋 Скопировать</button>`;$("v12copy").onclick=()=>copyText(t0.solution)}
+}
+function v12QuizHome(){
+  screen("practice:quiz");
+  $("v12PracticeContent").innerHTML=`<section class="hero"><h3>🧠 Викторина</h3><p>В каждом вопросе одна ошибка. Выбери <b>1 из 4</b> вариантов.</p><button class="primary" id="v12startQuiz">▶ Начать</button></section><div class="grid">${state.quizzes.map((q,i)=>`<div class="card"><span class="badge">Вопрос ${i+1}</span><h3>${h(q.title)}</h3><p>Найди ошибку в коде.</p></div>`).join("")}</div>`;
+  $("v12startQuiz").onclick=()=>v12OpenQuiz(0);
+}
+async function v12OpenQuiz(i){
+  const q=state.quizzes[i];if(!q)return;screen(`quiz:${q.id}`);
+  $("v12PracticeContent").innerHTML=header(`🧠 ${q.title}`)+`<article class="code-card"><span class="badge">${i+1} / ${state.quizzes.length}</span><pre class="code">${h(q.code)}</pre><h3>Как исправить?</h3><div id="v12opts">${q.options.map((o,j)=>`<button class="option" data-v12opt="${j}">${j+1}. ${h(o)}</button>`).join("")}</div><div id="v12qfeed"></div></article>`;
+  $("backBtn").onclick=()=>v12PracticeHome("quiz");
+  document.querySelectorAll("[data-v12opt]").forEach(x=>x.onclick=()=>v12AnswerQuiz(q,i,+x.dataset.v12opt));
+}
+async function v12AnswerQuiz(q,i,opt){
+  const bs=[...document.querySelectorAll("[data-v12opt]")];bs.forEach(x=>x.disabled=true);
+  try{
+    const d=await api("/api/quiz",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",quiz_id:q.id,option_index:opt})});
+    bs.forEach((b,j)=>{if(j===d.correct_option)b.classList.add("correct");if(j===opt&&!d.correct)b.classList.add("wrong")});
+    $("v12qfeed").innerHTML=`<div class="feedback"><b>${d.correct?"✅ Правильно":"❌ Неверно"}</b><br>${h(d.explanation)}<br><br><button class="primary" id="v12next">${i+1<state.quizzes.length?"Следующий вопрос →":"Завершить"}</button></div>`;
+    $("v12next").onclick=()=>i+1<state.quizzes.length?v12OpenQuiz(i+1):v12QuizHome();
+  }catch(e){$("v12qfeed").innerHTML=`<div class="feedback">❌ ${h(e.message)}</div>`}
+}
+function v12MiniHome(){
+  screen("practice:mini");
+  const a=Object.entries(state.miniCodes);
+  $("v12PracticeContent").innerHTML=`<section class="hero"><h3>💡 Мини-коды</h3><p>Небольшие проекты для экспериментов.</p></section><div class="grid">${a.map(([k,d])=>`<div class="card clickable" data-v12mini="${escapeAttr(k)}"><span class="badge">${h(d.category)}</span><h3>${h(d.title)}</h3><p>${h(d.description)}</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-v12mini]").forEach(x=>x.onclick=()=>openMini(x.dataset.v12mini));
+}
+function v12TrainerHome(){
+  screen("practice:trainer");
+  const tasks=[["add_numbers","Функция сложения","🟢","def add(a, b):\n    # напиши здесь\n    pass"],["even_number","Проверка чётности","🟢","def is_even(n):\n    # напиши здесь\n    pass"],["list_sum","Сумма списка","🟢","def list_sum(numbers):\n    # напиши здесь\n    pass"],["safe_get","dict.get()","🟡","def get_age(user):\n    # напиши здесь\n    pass"],["json_save","Сохранение JSON","🟠","import json\n\ndef save_json(data, filename):\n    # напиши здесь\n    pass"],["api_request","GET + JSON","🔴","import requests\n\n# напиши здесь"]];
+  state.v12Trainer=tasks;
+  $("v12PracticeContent").innerHTML=`<section class="hero"><h3>💻 Тренажёр кода</h3><p>Сервер проверяет синтаксис и структуру через AST. Python-код пользователя <b>не запускается</b>.</p></section><div class="grid">${tasks.map((t,i)=>`<div class="card clickable" data-v12trainer="${i}"><span class="badge">${t[2]}</span><h3>${h(t[1])}</h3><p>Напиши решение прямо в Mini App.</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-v12trainer]").forEach(x=>x.onclick=()=>v12OpenTrainer(+x.dataset.v12trainer));
+}
+function v12OpenTrainer(i){
+  const t0=state.v12Trainer[i];screen(`trainer:${t0[0]}`);
+  $("v12PracticeContent").innerHTML=header("💻 "+t0[1])+`<article class="code-card"><p>Попробуй решить задачу самостоятельно.</p><textarea id="v12editor" class="editor">${h(t0[3])}</textarea><div class="feature-actions"><button class="primary" id="v12check">▶ Проверить</button><button class="ghost" id="v12reset">↻ Сбросить</button></div><div id="v12coderesult"></div></article>`;
+  $("backBtn").onclick=()=>v12TrainerHome();
+  $("v12check").onclick=async()=>{
+    try{
+      const d=await api("/api/code-check",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",task_id:t0[0],code:$("v12editor").value})});
+      $("v12coderesult").innerHTML=`<div class="feedback"><b>${d.passed?"✅ Условие выполнено":"❌ Пока не готово"}</b><br>${h(d.message)}<br><small>${h(d.hint||"")}</small></div>`;
+    }catch(e){$("v12coderesult").innerHTML=`<div class="feedback">❌ ${h(e.message)}</div>`}
+  };
+  $("v12reset").onclick=()=>{$("v12editor").value=t0[3];$("v12coderesult").innerHTML=""};
+}
+function v12ProjectsHome(){
+  screen("practice:projects");
+  $("v12PracticeContent").innerHTML=`<section class="hero"><h3>🚀 Проекты</h3><p>Полноценные проекты из маленьких этапов.</p></section><div class="grid">${V12_PROJECTS.map((p,i)=>`<div class="card clickable" data-v12project="${i}"><h3>${h(p[1])}</h3><p>${h(p[2])}</p><span class="small">${p[3].length} этапов</span></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-v12project]").forEach(x=>x.onclick=()=>v12OpenProject(+x.dataset.v12project));
+}
+function v12OpenProject(i){
+  const p=V12_PROJECTS[i];screen("project:"+p[0]);
+  $("v12PracticeContent").innerHTML=header(p[1])+`<article class="lesson"><p>${h(p[2])}</p>${p[3].map((s,j)=>`<div class="project-stage"><b>${j+1}</b><span>${h(s)}</span><span class="small" style="margin-left:auto">${j===0?"▶":"🔒"}</span></div>`).join("")}<div class="feedback" style="margin-top:12px"><b>🎯 Совет</b><br>Делай рабочую минимальную версию, затем добавляй следующий этап. Не строй всё сразу.</div></article>`;
+  $("backBtn").onclick=()=>v12ProjectsHome();
+}
+const v12OldOpenLesson=openLesson;
+openLesson=async function(n,i){
+  await v12OldOpenLesson(n,i);
+  // Add the four learning helpers without replacing the existing lesson content.
+  const host=$("lessonHelper")||(()=>{const x=document.createElement("div");x.id="lessonHelper";return x})();
+};
+
+function v12Search(){
+  screen("search");
+  content.innerHTML=header("🔎 "+vt("search"),false)+`<div class="search-wrap"><input id="v12search" class="search" placeholder="${h(vt("searchPlaceholder"))}"><button class="primary" id="v12doSearch">Найти</button></div><div id="v12results"></div>`;
+  const run=()=>{
+    const q=$("v12search").value.trim().toLowerCase(),out=[];
+    for(const [n,s] of Object.entries(state.course))for(const topic of s.topics)if(!q||`${topic} ${s.title}`.toLowerCase().includes(q))out.push({kind:"Урок",title:topic,detail:s.title,fn:()=>openSection(+n)});
+    for(const [k,d] of Object.entries(state.frameworks))if(!q||`${d.name} ${d.desc}`.toLowerCase().includes(q))out.push({kind:"Фреймворк",title:d.name,detail:d.desc,fn:()=>openCatalogItem("framework",k,d.category)});
+    for(const [k,d] of Object.entries(state.libraries))if(!q||`${d.name} ${d.desc}`.toLowerCase().includes(q))out.push({kind:"Библиотека",title:d.name,detail:d.desc,fn:()=>openCatalogItem("library",k,d.category)});
+    for(const [k,d] of Object.entries(state.miniCodes))if(!q||`${d.title} ${d.description}`.toLowerCase().includes(q))out.push({kind:"Мини-код",title:d.title,detail:d.description,fn:()=>openMini(k)});
+    $("v12results").innerHTML=out.slice(0,80).map((r,i)=>`<div class="result-card" data-v12result="${i}"><span class="badge">${h(r.kind)}</span><h3>${h(r.title)}</h3><p>${h(r.detail)}</p></div>`).join("")||'<div class="empty">Ничего не найдено.</div>';
+    document.querySelectorAll("[data-v12result]").forEach((x,i)=>x.onclick=out[i].fn);
+  };
+  $("v12doSearch").onclick=run;$("v12search").oninput=run;run();
+}
+
+async function v12Mentor(){
+  screen("mentor");
+  content.innerHTML=header("🤖 Наставник",false)+`<section class="hero"><h3>Помощь по курсу</h3><p>Задай вопрос по Python, библиотеке или фреймворку — наставник найдёт связанные материалы.</p><textarea id="v12mentorQ" class="textarea" placeholder="Например: объясни циклы проще"></textarea><div class="mentor-row"><button class="primary" id="v12mentorAsk">Спросить</button><button class="ghost" id="v12mentorSimple">Проще</button><button class="ghost" id="v12mentorAnalogy">Аналогия</button></div></section><div id="v12mentorA"></div>`;
+  const ask=async mode=>{
+    const q=$("v12mentorQ").value.trim();if(!q){toast("Напиши вопрос");return}
+    $("v12mentorA").innerHTML='<div class="spinner">Наставник ищет материал…</div>';
+    try{
+      const d=await api("/api/mentor",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",query:q,mode})});
+      $("v12mentorA").innerHTML=`<div class="mentor-box"><h3>💬 Ответ</h3><p>${h(d.answer)}</p>${d.suggestions?.length?`<h4>📚 Материалы</h4>${d.suggestions.map((s,i)=>`<div class="result-card" data-v12mentor="${i}">${h(s.title)}</div>`).join("")}`:""}</div>`;
+      document.querySelectorAll("[data-v12mentor]").forEach((x,i)=>{
+        const s=d.suggestions[i];
+        if(s.kind==="framework")x.onclick=()=>openCatalogItem("framework",s.key,state.frameworks[s.key]?.category);
+        else if(s.kind==="library")x.onclick=()=>openCatalogItem("library",s.key,state.libraries[s.key]?.category);
+        else x.onclick=()=>{const a=Object.entries(state.course).find(([_,sec])=>sec.topics.includes(s.title));if(a)openSection(+a[0])};
+      });
+    }catch(e){$("v12mentorA").innerHTML=`<div class="feedback">❌ ${h(e.message)}</div>`}
+  };
+  $("v12mentorAsk").onclick=()=>ask("explain");$("v12mentorSimple").onclick=()=>ask("simple");$("v12mentorAnalogy").onclick=()=>ask("analogy");
+}
+
+async function v12Settings(){
+  screen("settings");
+  content.innerHTML=header("⚙️ "+vt("settings"),false)+`<section class="hero">
+    <div class="setting-row"><div class="setting-title">🌐 Язык</div><div class="setting-desc">Русский или English для интерфейса.</div><div class="chips"><button class="chip ${state.settings.language==="ru"?"active":""}" id="v12ru">🇷🇺 Русский</button><button class="chip ${state.settings.language==="en"?"active":""}" id="v12en">🇬🇧 English</button></div></div>
+    <div class="setting-row"><div class="setting-title">🎨 ${vt("theme")||"Тема"}</div><div class="setting-desc">Системная, тёмная или светлая.</div><div class="chips"><button class="chip ${state.settings.theme==="system"?"active":""}" data-v12theme="system">${vt("system")}</button><button class="chip ${state.settings.theme==="dark"?"active":""}" data-v12theme="dark">${vt("dark")}</button><button class="chip ${state.settings.theme==="light"?"active":""}" data-v12theme="light">${vt("light")}</button></div></div>
+    <div class="setting-row"><div class="setting-title">🎯 Цель обучения</div><div class="setting-desc">От неё зависит порядок карты обучения.</div>${v12GoalCards()}</div>
+  </section>
+  <section class="hero"><h3>⭐ Избранное</h3><div id="v12favorites"></div></section>
+  <section class="hero"><h3>👤 Профиль</h3><div id="v12profile"><div class="spinner">Загрузка…</div></div></section>`;
+  $("v12ru").onclick=async()=>{state.settings.language="ru";await v12SavePrefs();v12Settings()};
+  $("v12en").onclick=async()=>{state.settings.language="en";await v12SavePrefs();v12Settings()};
+  document.querySelectorAll("[data-v12theme]").forEach(x=>x.onclick=async()=>{state.settings.theme=x.dataset.v12theme;await v12SavePrefs();v12Settings()});
+  document.querySelectorAll("[data-v12goal]").forEach(x=>x.onclick=async()=>{state.settings.goal=x.dataset.v12goal;await v12SavePrefs();v12Settings()});
+  $("v12favorites").innerHTML=state.favorites.length?state.favorites.map(k=>`<div class="kpi"><span>${h(k)}</span><button class="ghost" data-v12unfav="${h(k)}">Удалить</button></div>`).join(""):'<div class="small">В карточке технологии нажми ☆, чтобы сохранить её.</div>';
+  document.querySelectorAll("[data-v12unfav]").forEach(x=>x.onclick=async()=>{
+    const [kind,key]=x.dataset.v12unfav.split(":");state.favorites=state.favorites.filter(a=>a!==x.dataset.v12unfav);localStorage.setItem("pyacademy_favorites",JSON.stringify(state.favorites));
+    try{await api("/api/favorites",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"remove",kind,item_key:key})})}catch{}v12Settings();
+  });
+  try{
+    const me=await api("/api/me",{method:"POST",body:JSON.stringify({initData:tg?.initData||""})});
+    $("v12profile").innerHTML=`<div class="kpi"><span>Username</span><b>${me.user?.username?`@${h(me.user.username)}`:"None"}</b></div><div class="kpi"><span>ID</span><b>${h(me.user?.id||"—")}</b></div><div class="kpi"><span>Имя</span><b>${h(me.user?.first_name||"None")}</b></div>`;
+  }catch{$("v12profile").innerHTML='<div class="small">Профиль Telegram пока недоступен.</div>'}
+}
+
+// Favorites for technology cards.
+const v12OldOpenCatalogItem=openCatalogItem;
+openCatalogItem=function(type,key,category){
+  v12OldOpenCatalogItem(type,key,category);
+  const head=document.querySelector(".section-head");if(!head)return;
+  const row=document.createElement("div");row.className="feature-actions";row.style.margin="0 0 10px";
+  const b=document.createElement("button");b.className="icon-btn";b.textContent=state.favorites.includes(`${type}:${key}`)?"★":"☆";
+  b.title="Избранное";b.onclick=async()=>{
+    const k=`${type}:${key}`,has=state.favorites.includes(k);
+    if(has)state.favorites=state.favorites.filter(x=>x!==k);else state.favorites.push(k);
+    localStorage.setItem("pyacademy_favorites",JSON.stringify(state.favorites));
+    try{await api("/api/favorites",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:has?"remove":"add",kind:type,item_key:key})})}catch{}
+    b.textContent=has?"☆":"★";
+  };
+  row.appendChild(b);head.parentNode.insertBefore(row,head.nextSibling);
+};
+
+// Admin analytics block.
+const v12OldAdminHome=adminHome;
+adminHome=function(){
+  v12OldAdminHome();
+  setTimeout(async()=>{
+    const host=document.getElementById("adminUsers");if(!host)return;
+    const box=document.createElement("section");box.className="hero";box.style.marginTop="12px";box.innerHTML='<h3>📈 Аналитика Mini App</h3><div id="v12analytics">Загрузка…</div>';
+    host.parentNode.insertBefore(box,host);
+    try{
+      const d=await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"analytics"})});
+      document.getElementById("v12analytics").innerHTML=`<div class="grid"><div class="card"><h3>📍 Текущие вкладки</h3>${d.current_tabs.map(x=>`<div class="kpi"><span>${h(x.tab)}</span><b>${x.count}</b></div>`).join("")||"—"}</div><div class="card"><h3>🔥 Частые действия</h3>${d.top_views.map(x=>`<div class="kpi"><span>${h(x.kind)}: ${h(x.title)}</span><b>${x.count}</b></div>`).join("")||"—"}</div></div>`;
+    }catch(e){document.getElementById("v12analytics").textContent=e.message}
+  },0);
+};
+
+// Override practice + learning after the original functions are defined.
+practiceHome=v12PracticeHome;
+learningHome=v12LearningHome;
+
+// New navigation.
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  const t0=b.dataset.tab;
+  if(t0==="learn")v12LearningHome();
+  else if(t0==="course")courseHome();
+  else if(t0==="frameworks")catalogHome("framework");
+  else if(t0==="libraries")catalogHome("library");
+  else if(t0==="practice")v12PracticeHome("tasks");
+  else if(t0==="mentor")v12Mentor();
+  else if(t0==="progress")progressHome();
+  else if(t0==="support")supportHome();
+  else if(t0==="settings")v12Settings();
+  else if(t0==="admin"&&state.isAdmin)adminHome();
+});
+$("searchBtn").onclick=v12Search;
+$("settingsBtn").onclick=v12Settings;
+
+// Apply preference before launch.
+v12LoadPrefs();
+
+// Wrap original loadApp so Mini App restores server settings and favorites after auth.
+const v12BaseLoadApp=loadApp;
+loadApp=async function(){
+  await v12BaseLoadApp();
+  try{
+    if(tg?.initData){
+      const me=await api("/api/me",{method:"POST",body:JSON.stringify({initData:tg.initData})});
+      if(me.settings){
+        state.settings.language=me.settings.language||state.settings.language;
+        state.settings.theme=me.settings.theme||state.settings.theme;
+        state.settings.goal=me.settings.goal||state.settings.goal;
+        localStorage.setItem("pyacademy_settings",JSON.stringify(state.settings));
+        v12ApplyTheme(state.settings.theme);
+      }
+      state.isAdmin=!!me.is_admin;
+      if(state.isAdmin)$("adminTab").style.display="block";
+      const fav=await api("/api/favorites",{method:"POST",body:JSON.stringify({initData:tg.initData,action:"list"})});
+      state.favorites=(fav.favorites||[]).map(x=>`${x.kind}:${x.item_key}`);
+      localStorage.setItem("pyacademy_favorites",JSON.stringify(state.favorites));
+    }
+  }catch(e){console.warn("V12 preferences load:",e.message)}
+  v12ApplyTheme(state.settings.theme);
+  applyI18n?.();
+};
+
 loadApp();
 </script>
 </body>
