@@ -191,6 +191,17 @@ def init_db():
         # SQLite делает полный перебор таблицы views на каждый запрос.
         conn.execute("CREATE INDEX IF NOT EXISTS idx_views_user ON views(user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_views_kind ON views(user_id, kind)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                quiz_id TEXT NOT NULL,
+                option_index INTEGER NOT NULL,
+                correct INTEGER NOT NULL,
+                answered_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quiz_user ON quiz_attempts(user_id)")
 
         # --- Миграция для баз, созданных до появления колонок вкладки ---
         # (ALTER TABLE ADD COLUMN в SQLite не поддерживает IF NOT EXISTS,
@@ -1221,6 +1232,17 @@ MINI_CODES = {
     },
 }
 
+
+# =========================================================
+# ПУТЬ ОБУЧЕНИЯ / ПРАКТИКА / ВИКТОРИНА
+# =========================================================
+
+LEARNING_PLAN = [{'id': 'start', 'title': '🌱 Старт: Python с нуля', 'level': 'Начальный', 'description': 'Первые шаги: как устроен Python, как запускать код и читать простые программы.', 'modules': [{'title': '1. Знакомство с Python', 'topics': ['Что такое Python', 'print()', 'Комментарии']}, {'title': '2. Данные и переменные', 'topics': ['Переменные', 'int / float', 'str / bool', 'type()', 'None']}, {'title': '3. Ввод и простые вычисления', 'topics': ['input()', 'Арифметические', 'Присваивания']}], 'tips': ['Пиши код руками, а не только копируй его.', 'После каждого примера попробуй изменить одно значение и предсказать результат.', 'Ошибки — нормальная часть обучения: сначала прочитай текст ошибки.']}, {'id': 'logic', 'title': '🧠 Логика программ', 'level': 'Начальный', 'description': 'Учимся принимать решения, сравнивать данные и повторять действия.', 'modules': [{'title': '4. Условия', 'topics': ['if', 'elif', 'else', 'вложенные условия', 'тернарный оператор', 'match / case']}, {'title': '5. Циклы', 'topics': ['for', 'while', 'range()', 'break', 'continue', 'вложенные циклы']}, {'title': '6. Коллекции', 'topics': ['list', 'tuple', 'set', 'dict', 'Индексы', 'Срезы']}], 'tips': ['Всегда сначала формулируй условие словами.', 'Разделяй большую задачу на маленькие шаги.', 'Следи за отступами — в Python они часть синтаксиса.']}, {'id': 'functions', 'title': '🧩 Функции и чистый код', 'level': 'Начальный → Средний', 'description': 'Переходим от отдельных строк к переиспользуемым блокам программы.', 'modules': [{'title': '7. Функции', 'topics': ['def', 'return', 'параметры', 'аргументы', 'значения по умолчанию', '*args', '**kwargs']}, {'title': '8. Область видимости', 'topics': ['область видимости', 'global', 'nonlocal', 'lambda', 'рекурсия']}, {'title': '9. Comprehension', 'topics': ['list comprehension', 'dict comprehension', 'set comprehension', 'условия', 'вложенные comprehension']}], 'tips': ['Одна функция — одна понятная задача.', 'Давай переменным и функциям понятные имена.', 'Не усложняй код раньше времени.']}, {'id': 'errors', 'title': '🛡 Ошибки, файлы и данные', 'level': 'Средний', 'description': 'Учимся делать программы устойчивыми и сохранять данные.', 'modules': [{'title': '10. Исключения', 'topics': ['SyntaxError', 'TypeError', 'ValueError', 'IndexError', 'KeyError', 'try', 'except', 'finally', 'raise']}, {'title': '11. Файлы', 'topics': ['open()', 'read()', 'write()', 'with', 'JSON', 'CSV']}, {'title': '12. Модули', 'topics': ['import', 'from ... import', 'as', 'os', 'sys', 'pathlib', 'создание своих модулей']}], 'tips': ['Обрабатывай только те ошибки, которые действительно можешь обработать.', 'Для файлов предпочитай with.', 'Разбивай большой проект на модули.']}, {'id': 'oop', 'title': '🏗 ООП', 'level': 'Средний', 'description': 'Классы, объекты, наследование и организация больших программ.', 'modules': [{'title': '13. Классы и объекты', 'topics': ['Что такое класс', 'object', '__init__', 'self', 'атрибуты', 'методы']}, {'title': '14. Связи между классами', 'topics': ['наследование', 'super()', 'полиморфизм', 'инкапсуляция']}, {'title': '15. Продвинутые возможности', 'topics': ['@property', 'classmethod', 'staticmethod', 'dataclass', 'магические методы']}], 'tips': ['Не используй ООП только ради ООП.', 'Сначала пойми данные и поведение объекта, потом проектируй класс.', 'Наследование не всегда нужно — иногда композиция проще.']}, {'id': 'advanced', 'title': '⚡ Продвинутый Python', 'level': 'Продвинутый', 'description': 'Инструменты языка, которые помогают писать компактный и мощный код.', 'modules': [{'title': '16. Итераторы и генераторы', 'topics': ['итераторы', 'iter()', 'next()', 'генераторы', 'yield']}, {'title': '17. Функциональные инструменты', 'topics': ['декораторы', 'замыкания', 'map()', 'filter()', 'zip()', 'enumerate()', 'any()', 'all()', 'functools']}, {'title': '18. Асинхронность', 'topics': ['async', 'await', 'asyncio', 'coroutine', 'Task', 'gather()', 'sleep()', 'Queue']}], 'tips': ['Сначала добивайся понятного решения, потом оптимизируй.', 'Понимай, где код ждёт ввод-вывод — там часто полезен async.', 'Изучай стандартную библиотеку: там уже есть много готовых инструментов.']}, {'id': 'webdb', 'title': '🌐 Веб, API и базы данных', 'level': 'Продвинутый', 'description': 'Переходим к приложениям, серверам, API и хранению данных.', 'modules': [{'title': '19. SQL и SQLite', 'topics': ['SQL', 'sqlite3', 'CREATE', 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WHERE', 'JOIN', 'Python + SQLite']}, {'title': '20. Интернет и API', 'topics': ['HTTP', 'GET', 'POST', 'JSON', 'requests', 'REST API', 'headers', 'работа с API']}, {'title': '21. Веб-разработка', 'topics': ['Flask', 'FastAPI', 'Django', 'маршруты', 'запросы', 'шаблоны', 'JSON API', 'базы данных']}], 'tips': ['Понимай HTTP до того, как глубоко уходить в веб-фреймворки.', 'Разделяй бизнес-логику и работу с базой.', 'Никогда не храни токены и пароли прямо в коде.']}, {'id': 'projects', 'title': '🚀 Проекты и профессия', 'level': 'Продвинутый → Профи', 'description': 'Собираем знания в реальные проекты и учимся работать как разработчик.', 'modules': [{'title': '22. Telegram-боты', 'topics': ['aiogram', 'Bot', 'Dispatcher', 'handlers', 'Message', 'CallbackQuery', 'InlineKeyboard', 'команды', 'FSM', 'состояния']}, {'title': '23. Практические проекты', 'topics': ['Калькулятор', 'Конвертер', 'Игра', 'Telegram-бот', 'Бот с SQLite', 'API', 'Парсер', 'Веб-приложение']}, {'title': '24. Инструменты разработчика', 'topics': ['pip', 'venv', 'requirements.txt', 'PyPI', 'git init', 'git add', 'git commit', 'git push', 'GitHub']}], 'tips': ['Каждый изученный блок закрепляй маленьким проектом.', 'Веди проекты в Git и пиши README.', 'Собери 3–5 законченных работ, которые можно показать другим.']}]
+
+PRACTICE_TASKS = [{'id': 't1', 'title': 'Чётное или нечётное', 'difficulty': '🟢 Легко', 'prompt': 'Попроси пользователя ввести целое число и выведи, чётное оно или нечётное.', 'hint': 'Используй остаток от деления %.', 'solution': 'n = int(input("Число: "))\nif n % 2 == 0:\n    print("Чётное")\nelse:\n    print("Нечётное")'}, {'id': 't2', 'title': 'Максимум из двух', 'difficulty': '🟢 Легко', 'prompt': 'Введи два числа и выведи большее из них.', 'hint': 'Сравни числа через if/else или max().', 'solution': 'a = int(input())\nb = int(input())\nprint(max(a, b))'}, {'id': 't3', 'title': 'Сумма списка', 'difficulty': '🟢 Легко', 'prompt': 'Создай список чисел и посчитай сумму его элементов без ручного сложения.', 'hint': 'Попробуй sum().', 'solution': 'numbers = [3, 7, 2, 9]\nprint(sum(numbers))'}, {'id': 't4', 'title': 'Подсчёт гласных', 'difficulty': '🟡 Средне', 'prompt': 'Посчитай, сколько гласных букв в строке.', 'hint': 'Используй строку vowels = "аеёиоуыэюя" и цикл for.', 'solution': 'text = input().lower()\ncount = sum(ch in "аеёиоуыэюя" for ch in text)\nprint(count)'}, {'id': 't5', 'title': 'Разворот строки', 'difficulty': '🟡 Средне', 'prompt': 'Выведи строку в обратном порядке.', 'hint': 'Вспомни срез [::-1].', 'solution': 'text = input()\nprint(text[::-1])'}, {'id': 't6', 'title': 'Функция приветствия', 'difficulty': '🟡 Средне', 'prompt': 'Напиши функцию greet(name), которая возвращает приветствие с именем.', 'hint': 'Функция должна использовать return.', 'solution': 'def greet(name):\n    return f"Привет, {name}!"'}, {'id': 't7', 'title': 'Словарь пользователя', 'difficulty': '🟡 Средне', 'prompt': 'Создай словарь с name и age, затем безопасно получи значение age через get().', 'hint': 'get() принимает ключ и значение по умолчанию.', 'solution': 'user = {"name": "Alex", "age": 14}\nprint(user.get("age", 0))'}, {'id': 't8', 'title': 'Чтение JSON', 'difficulty': '🟠 Сложнее', 'prompt': 'Сохрани словарь в JSON-файл, а затем прочитай его обратно.', 'hint': 'Нужен модуль json и dump/load.', 'solution': 'import json\ndata = {"name": "Alex"}\nwith open("data.json", "w", encoding="utf-8") as f:\n    json.dump(data, f, ensure_ascii=False)'}, {'id': 't9', 'title': 'SQLite запрос', 'difficulty': '🟠 Сложнее', 'prompt': 'Подключись к SQLite и выполни SELECT из таблицы users.', 'hint': 'Используй sqlite3.connect() и execute().', 'solution': 'import sqlite3\nconn = sqlite3.connect("app.db")\nrows = conn.execute("SELECT * FROM users").fetchall()\nprint(rows)\nconn.close()'}, {'id': 't10', 'title': 'Асинхронная пауза', 'difficulty': '🟠 Сложнее', 'prompt': 'Напиши async-функцию, которая ждёт одну секунду через asyncio.sleep().', 'hint': 'Внутри async def можно использовать await.', 'solution': 'import asyncio\n\nasync def main():\n    await asyncio.sleep(1)\n    print("Готово")\n\nasyncio.run(main())'}, {'id': 't11', 'title': 'API JSON', 'difficulty': '🔴 Продвинуто', 'prompt': 'Сделай GET-запрос через requests и выведи JSON-ответ.', 'hint': 'У ответа есть метод json().', 'solution': 'import requests\nresponse = requests.get("https://api.example.com/data")\nprint(response.json())'}, {'id': 't12', 'title': 'Telegram обработчик', 'difficulty': '🔴 Продвинуто', 'prompt': 'Создай простой handler в aiogram, который отвечает на текст «Привет».', 'hint': 'Используй декоратор @dp.message и F.text.', 'solution': '@dp.message(F.text == "Привет")\nasync def hello(message: Message):\n    await message.answer("Привет!")'}]
+
+QUIZ_QUESTIONS = [{'id': 'q1', 'title': 'Условия', 'code': 'age = 20\n\nif age >= 18\n    print("Взрослый")', 'options': ['Добавить : после условия if', 'Заменить >= на =', 'Удалить отступ перед print()', 'Добавить скобки вокруг age'], 'correct': 0, 'explanation': 'После условия if в Python нужен двоеточие :.'}, {'id': 'q2', 'title': 'Сравнение', 'code': 'x = 10\nif x = 10:\n    print("yes")', 'options': ['x == 10', 'x := 10', 'x >= 10', 'x is 10'], 'correct': 0, 'explanation': 'Для сравнения значений используется ==, а = — присваивание.'}, {'id': 'q3', 'title': 'Список', 'code': 'numbers = [1, 2, 3]\nprint(numbers[3])', 'options': ['print(numbers[2])', 'print(numbers[1])', 'print(numbers[-3])', 'print(numbers[0])'], 'correct': 0, 'explanation': 'Последний элемент списка с тремя значениями имеет индекс 2.'}, {'id': 'q4', 'title': 'Функция', 'code': 'def add(a, b)\n    return a + b', 'options': ['Добавить : после )', 'Добавить ; после )', 'Заменить return на print', 'Удалить отступ перед return'], 'correct': 0, 'explanation': 'После объявления функции тоже нужен двоеточие :.'}, {'id': 'q5', 'title': 'Переменная', 'code': 'name = "Alex"\nprint(nmae)', 'options': ['print(name)', 'print("name")', 'print(Name)', 'print(name())'], 'correct': 0, 'explanation': 'Имя переменной написано с опечаткой: nmae вместо name.'}, {'id': 'q6', 'title': 'Длина числа', 'code': 'age = 14\nprint(len(age))', 'options': ['print(len(str(age)))', 'print(age.len())', 'print(length(age))', 'print(len(int(age)))'], 'correct': 0, 'explanation': 'len() работает с последовательностями; число можно сначала превратить в строку.'}, {'id': 'q7', 'title': 'Словарь', 'code': 'user = {"name": "Alex"}\nprint(user["age"])', 'options': ['print(user.get("age"))', 'print(user.get["age"])', 'print(user.age)', 'print(user("age"))'], 'correct': 0, 'explanation': 'get() безопасно получает значение по ключу, которого может не быть.'}, {'id': 'q8', 'title': 'Импорт', 'code': 'import maths\nprint(math.sqrt(16))', 'options': ['import math', 'import mathematics as math', 'from math import sqrt', 'import math as maths'], 'correct': 0, 'explanation': 'Модуль стандартной библиотеки называется math, а не maths.'}, {'id': 'q9', 'title': 'Цикл', 'code': 'for i in range(3)\n    print(i)', 'options': ['Добавить : после range(3)', 'Заменить for на while', 'Удалить отступ перед print(i)', 'Добавить i = 0 перед for'], 'correct': 0, 'explanation': 'После заголовка цикла for нужен двоеточие :.'}, {'id': 'q10', 'title': 'Строка', 'code': 'text = "Python"\nprint(text.upper)', 'options': ['print(text.upper())', 'print(upper(text))', 'print(text.upper[])', 'print(text->upper())'], 'correct': 0, 'explanation': 'Метод upper нужно вызвать со скобками: upper().'}, {'id': 'q11', 'title': 'Список', 'code': 'items = []\nitems.apend(1)\nprint(items)', 'options': ['items.append(1)', 'items.add(1)', 'items.insert(1)', 'items.push(1)'], 'correct': 0, 'explanation': 'У списка Python метод называется append().'}, {'id': 'q12', 'title': 'Файл', 'code': 'with open("data.txt", "r" encoding="utf-8") as f:\n    print(f.read())', 'options': ['with open("data.txt", "r", encoding="utf-8") as f:', 'with open("data.txt", r, encoding="utf-8") as f:', 'with open("data.txt"; "r"; encoding="utf-8") as f:', 'with open("data.txt", "r"), encoding="utf-8" as f:'], 'correct': 0, 'explanation': 'Аргументы функции open() разделяются запятыми.'}, {'id': 'q13', 'title': 'Comprehension', 'code': 'even = [x for x in range(10) x % 2 == 0]', 'options': ['even = [x for x in range(10) if x % 2 == 0]', 'even = [x if for x in range(10) % 2 == 0]', 'even = [x in range(10) if x % 2 == 0]', 'even = (x for x in range(10) if x % 2 == 0]'], 'correct': 0, 'explanation': 'В list comprehension условие вводится через if.'}, {'id': 'q14', 'title': 'Asyncio', 'code': 'async def main():\n    asyncio.sleep(1)\n    print("done")', 'options': ['await asyncio.sleep(1)', 'asyncio.await sleep(1)', 'await asyncio.sleep', 'async sleep(1)'], 'correct': 0, 'explanation': 'Асинхронную операцию внутри async-функции нужно ожидать через await.'}, {'id': 'q15', 'title': 'SQLite', 'code': 'conn = sqlite3.connect("app.db")\nconn.execute("INSERT INTO users (name) VALUES (?)", "Alex")', 'options': ['conn.execute("INSERT INTO users (name) VALUES (?)", ("Alex",))', 'conn.execute("INSERT INTO users (name) VALUES (?)", [Alex])', 'conn.execute("INSERT INTO users (name) VALUES (?)", Alex)', 'conn.execute("INSERT INTO users (name) VALUES (?)", {"Alex"})'], 'correct': 0, 'explanation': 'Параметры для DB-API передаются как последовательность значений, здесь кортеж из одного элемента.'}]
+
 # =========================================================
 # ГЛАВНОЕ МЕНЮ (кнопки по 2 в ряд)
 # =========================================================
@@ -2172,6 +2194,12 @@ def _build_course_payload() -> dict:
             for key, data in LIBRARIES.items()
         },
         "mini_codes": MINI_CODES,
+        "learning_plan": LEARNING_PLAN,
+        "practice_tasks": PRACTICE_TASKS,
+        "quizzes": [
+            {"id": q["id"], "title": q["title"], "code": q["code"], "options": q["options"]}
+            for q in QUIZ_QUESTIONS
+        ],
         "total_topics": TOTAL_TOPICS,
     }
 
@@ -2281,7 +2309,52 @@ async def api_progress(request: web.Request) -> web.Response:
     uid = int(user["id"])
     await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
     done = await asyncio.to_thread(_count_done_topics_sync, uid)
-    return _cors(web.json_response({"done": done, "total": TOTAL_TOPICS}))
+    def _quiz_stats_sync():
+        with db_connect() as conn:
+            row = conn.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM quiz_attempts WHERE user_id=?", (uid,)).fetchone()
+            return int(row[0]), int(row[1])
+    quiz_total, quiz_correct = await asyncio.to_thread(_quiz_stats_sync)
+    return _cors(web.json_response({"done": done, "total": TOTAL_TOPICS, "quiz_total": quiz_total, "quiz_correct": quiz_correct}))
+
+
+async def _save_quiz_attempt_sync(user_id: int, quiz_id: str, option_index: int, correct: bool):
+    now = datetime.now().isoformat(timespec="seconds")
+    with db_connect() as conn:
+        conn.execute(
+            "INSERT INTO quiz_attempts (user_id, quiz_id, option_index, correct, answered_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, quiz_id, option_index, 1 if correct else 0, now),
+        )
+        conn.commit()
+
+
+async def api_quiz_answer(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+
+    quiz_id = str(body.get("quiz_id", ""))
+    try:
+        option_index = int(body.get("option_index"))
+    except (TypeError, ValueError):
+        return _cors(web.json_response({"error": "invalid option"}, status=400))
+
+    question = next((q for q in QUIZ_QUESTIONS if q["id"] == quiz_id), None)
+    if not question:
+        return _cors(web.json_response({"error": "quiz not found"}, status=404))
+    if option_index < 0 or option_index >= len(question["options"]):
+        return _cors(web.json_response({"error": "invalid option"}, status=400))
+
+    uid = int(user["id"])
+    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
+    correct = option_index == question["correct"]
+    await asyncio.to_thread(_save_quiz_attempt_sync, uid, quiz_id, option_index, correct)
+    await log_view(uid, "quiz", quiz_id + (":correct" if correct else ":wrong"))
+
+    return _cors(web.json_response({
+        "correct": correct,
+        "correct_option": question["correct"],
+        "explanation": question["explanation"],
+    }))
 
 
 async def api_tab(request: web.Request) -> web.Response:
@@ -2392,9 +2465,10 @@ def build_webapp() -> web.Application:
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
     app.router.add_post("/api/progress", api_progress)
     app.router.add_post("/api/tab", api_tab)
+    app.router.add_post("/api/quiz", api_quiz_answer)
     app.router.add_post("/api/admin", api_admin)
 
-    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/admin"):
+    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/quiz", "/api/admin"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):
