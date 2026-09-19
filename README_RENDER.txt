@@ -1,3 +1,5 @@
+Python Academy v10.0.0 — cache bust + admin broadcasts + version diagnostics.
+
 Python Academy v9 — Render
 
 Environment:

@@ -145,6 +145,7 @@ def is_admin_user(user_id: int) -> bool:
 # Требования Telegram: адрес обязательно HTTPS (кроме localhost при
 # тестировании через ngrok/аналоги — тогда достаточно https-туннеля).
 
+APP_VERSION = "11.0.0"
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
 def normalize_miniapp_url(url: str) -> str:
@@ -152,7 +153,7 @@ def normalize_miniapp_url(url: str) -> str:
         return ""
     clean = url.rstrip("/")
     sep = "&" if "?" in clean else "?"
-    return clean + sep + "v=6" if clean.lower().endswith(".html") else clean + "/index.html?v=6"
+    return clean + sep + "v=11" if clean.lower().endswith(".html") else clean + "/index.html?v=11"
 
 MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
 
@@ -239,6 +240,14 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN current_tab TEXT")
         if "current_tab_at" not in existing_cols:
             conn.execute("ALTER TABLE users ADD COLUMN current_tab_at TEXT")
+
+        support_cols = {row[1] for row in conn.execute("PRAGMA table_info(support_messages)")}
+        if "reply_text" not in support_cols:
+            conn.execute("ALTER TABLE support_messages ADD COLUMN reply_text TEXT")
+        if "replied_at" not in support_cols:
+            conn.execute("ALTER TABLE support_messages ADD COLUMN replied_at TEXT")
+        if "admin_id" not in support_cols:
+            conn.execute("ALTER TABLE support_messages ADD COLUMN admin_id INTEGER")
 
         conn.commit()
 
@@ -3050,8 +3059,14 @@ async def api_debug_init(request: web.Request) -> web.Response:
     }))
 
 
+async def api_version(request: web.Request) -> web.Response:
+    return _cors(web.json_response({"version": APP_VERSION, "miniapp_url": MINIAPP_LAUNCH_URL}))
+
+
 async def api_course(request: web.Request) -> web.Response:
-    return _cors(web.json_response(_build_course_payload()))
+    payload = _build_course_payload()
+    payload["app_version"] = APP_VERSION
+    return _cors(web.json_response(payload, headers={"Cache-Control": "no-store"}))
 
 
 async def api_me(request: web.Request) -> web.Response:
@@ -3166,13 +3181,44 @@ async def api_support(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
     if not user or not user.get("id"):
         return _cors(web.json_response({"error": "invalid initData"}, status=401))
+
+    uid = int(user["id"])
+    action = str(body.get("action", "create")).strip().lower()
+
+    if action == "list":
+        def _list():
+            with db_connect() as conn:
+                rows = conn.execute(
+                    """SELECT id,text,created_at,status,reply_text,replied_at
+                       FROM support_messages
+                       WHERE user_id=?
+                       ORDER BY id DESC LIMIT 50""",
+                    (uid,),
+                ).fetchall()
+            return rows
+        rows = await asyncio.to_thread(_list)
+        return _cors(web.json_response({
+            "tickets": [
+                {
+                    "id": r[0], "text": r[1], "created_at": r[2],
+                    "status": r[3], "reply_text": r[4] or "", "replied_at": r[5] or ""
+                }
+                for r in rows
+            ]
+        }))
+
     text = str(body.get("text", "")).strip()[:4000]
     if not text:
         return _cors(web.json_response({"error": "empty message"}, status=400))
-    uid = int(user["id"])
+
     username = user.get("username", "")
     first_name = user.get("first_name", "")
-    ticket_id = await send_support_to_admins(type("WebUser", (), {"id": uid, "username": username, "first_name": first_name})(), text)
+    ticket_id = await send_support_to_admins(
+        type("WebUser", (), {
+            "id": uid, "username": username, "first_name": first_name
+        })(),
+        text,
+    )
     await log_view(uid, "support", f"ticket:{ticket_id}")
     return _cors(web.json_response({"ok": True, "ticket_id": ticket_id}))
 
@@ -3226,22 +3272,71 @@ def _admin_user_views_sync(user_id: int, limit: int = 50):
     return user, views
 
 
+async def _get_broadcast_user_ids(mode: str) -> list[int]:
+    now = datetime.now()
+    if mode == "admins":
+        return sorted(ADMIN_IDS)
+    with db_connect() as conn:
+        if mode == "active":
+            cutoff = (now.timestamp() - 15 * 60)
+            rows = conn.execute("SELECT user_id, last_seen FROM users WHERE last_seen IS NOT NULL").fetchall()
+            result = []
+            for uid, last_seen in rows:
+                try:
+                    ts = datetime.fromisoformat(last_seen).timestamp()
+                    if ts >= cutoff:
+                        result.append(int(uid))
+                except Exception:
+                    continue
+            return result
+        rows = conn.execute("SELECT user_id FROM users").fetchall()
+        return [int(r[0]) for r in rows]
+
+
+async def _perform_broadcast(mode: str, message_text: str) -> tuple[int, int]:
+    ids = await asyncio.to_thread(_get_broadcast_user_ids, mode)
+    # _get_broadcast_user_ids is async; get the actual list directly below.
+    ids = await _get_broadcast_user_ids(mode)
+    sent = failed = 0
+    for uid in ids:
+        try:
+            await bot.send_message(uid, message_text, parse_mode=None)
+            sent += 1
+            await asyncio.sleep(0.03)
+        except Exception:
+            failed += 1
+    return sent, failed
+
+
 async def api_admin(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
-    if not user or ADMIN_ID == 0 or int(user.get("id", 0)) != ADMIN_ID:
+    if not user or not is_admin_user(int(user.get("id", 0))):
         return _cors(web.json_response({"error": "forbidden"}, status=403))
 
     action = str(body.get("action", "users"))
 
-    if action == "users":
+    if action in {"users", "active"}:
         users = await asyncio.to_thread(_admin_users_sync, str(body.get("query", ""))[:80], 200)
+        if action == "active":
+            cutoff = datetime.now().timestamp() - 15 * 60
+            active_users = []
+            for item in users:
+                stamp = item.get("current_tab_at") or item.get("last_seen")
+                try:
+                    if stamp and datetime.fromisoformat(stamp).timestamp() >= cutoff:
+                        active_users.append(item)
+                except Exception:
+                    pass
+            users = active_users
         with db_connect() as conn:
             total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             total_views = conn.execute("SELECT COUNT(*) FROM views").fetchone()[0]
+            cutoff_iso = datetime.now().isoformat(timespec="seconds")
         return _cors(web.json_response({
             "users": users,
             "total_users": total_users,
             "total_views": total_views,
+            "active_count": len(users) if action == "active" else None,
         }))
 
     if action == "user":
@@ -3275,9 +3370,10 @@ async def api_admin(request: web.Request) -> web.Response:
     if action == "support":
         with db_connect() as conn:
             rows = conn.execute(
-                "SELECT id,user_id,username,first_name,text,created_at,status FROM support_messages ORDER BY id DESC LIMIT 100"
+                """SELECT id,user_id,username,first_name,text,created_at,status,reply_text,replied_at,admin_id
+                   FROM support_messages ORDER BY id DESC LIMIT 100"""
             ).fetchall()
-        keys = ["id","user_id","username","first_name","text","created_at","status"]
+        keys = ["id","user_id","username","first_name","text","created_at","status","reply_text","replied_at","admin_id"]
         return _cors(web.json_response({"tickets": [dict(zip(keys, r)) for r in rows]}))
 
     if action == "support_reply":
@@ -3296,10 +3392,22 @@ async def api_admin(request: web.Request) -> web.Response:
             await bot.send_message(int(row[0]), f"🆘 <b>Ответ поддержки</b>\n\n{html.escape(message_text)}", parse_mode="HTML")
         except Exception as exc:
             return _cors(web.json_response({"error": str(exc)}, status=400))
+        now = datetime.now().isoformat(timespec="seconds")
         with db_connect() as conn:
-            conn.execute("UPDATE support_messages SET status='answered' WHERE id=?", (ticket_id,))
+            conn.execute(
+                "UPDATE support_messages SET status='answered', reply_text=?, replied_at=?, admin_id=? WHERE id=?",
+                (message_text, now, int(user["id"]), ticket_id),
+            )
             conn.commit()
-        return _cors(web.json_response({"ok": True}))
+        return _cors(web.json_response({"ok": True, "replied_at": now}))
+
+    if action in {"broadcast_all", "broadcast_active", "broadcast_admins"}:
+        message_text = str(body.get("text", ""))[:4000].strip()
+        if not message_text:
+            return _cors(web.json_response({"error": "empty message"}, status=400))
+        mode = {"broadcast_all": "all", "broadcast_active": "active", "broadcast_admins": "admins"}[action]
+        sent, failed = await _perform_broadcast(mode, message_text)
+        return _cors(web.json_response({"ok": True, "sent": sent, "failed": failed, "mode": mode}))
 
     return _cors(web.json_response({"error": "unknown action"}, status=400))
 
@@ -3308,6 +3416,7 @@ def build_webapp() -> web.Application:
     app = web.Application()
     app.router.add_get("/health", health)
     app.router.add_get("/api/debug-init", api_debug_init)
+    app.router.add_get("/api/version", api_version)
     app.router.add_get("/api/course", api_course)
     app.router.add_post("/api/me", api_me)
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
@@ -3317,12 +3426,16 @@ def build_webapp() -> web.Application:
     app.router.add_post("/api/quiz", api_quiz_answer)
     app.router.add_post("/api/admin", api_admin)
 
-    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin"):
+    for path in ("/api/version", "/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):
         async def index(request: web.Request) -> web.Response:
-            return web.FileResponse(os.path.join(WEBAPP_DIR, "index.html"))
+            response = web.FileResponse(os.path.join(WEBAPP_DIR, "index.html"))
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            return response
 
         # /, /index.html и /webapp/ открывают само приложение, а не Index of /.
         app.router.add_get("/", index)

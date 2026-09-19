@@ -7,129 +7,680 @@
 <title>Python Academy</title>
 <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <style>
-:root{--bg:var(--tg-theme-bg-color,#0f172a);--card:var(--tg-theme-secondary-bg-color,#172033);--text:var(--tg-theme-text-color,#f8fafc);--hint:var(--tg-theme-hint-color,#94a3b8);--accent:var(--tg-theme-button-color,#2481cc);--accentText:var(--tg-theme-button-text-color,#fff);--line:rgba(148,163,184,.16)}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{padding-bottom:94px}.app{max-width:820px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px}.brand{font-weight:900;font-size:20px}.user{color:var(--hint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hero,.card,.topic,.lesson,.cmd-card,.code-card,.user-card,.stat{background:var(--card);border:1px solid var(--line);border-radius:18px}.hero{padding:18px;margin-bottom:14px}.hero h1{margin:0 0 8px}.hero p,.card p,.topic span,.small{color:var(--hint)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{padding:15px;min-height:104px}.card h3{margin:0 0 8px;font-size:16px}.topic{padding:13px;display:flex;justify-content:space-between;gap:10px}.topic strong{font-size:14px}.section-head{display:flex;align-items:center;gap:9px;margin:8px 0 13px}.section-head h2{margin:0;flex:1;font-size:21px}.back,.ghost,.primary{border:0;border-radius:12px;padding:10px 12px}.back,.ghost{background:var(--card);color:var(--text)}.primary{background:var(--accent);color:var(--accentText)}.lesson{padding:16px}.lesson img{width:100%;max-height:220px;object-fit:contain;background:#fff;border-radius:14px;margin-bottom:12px}.lesson-body{line-height:1.65;font-size:15px;overflow-wrap:anywhere}.lesson-body code,.code{display:block;white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);padding:12px;border-radius:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.45}.action{display:inline-block;margin-top:12px;padding:10px 13px;border-radius:12px;background:var(--accent);color:var(--accentText);text-decoration:none}.command-list{display:grid;gap:8px;margin-top:10px}.cmd-card{padding:13px;text-align:left;color:var(--text);width:100%}.cmd-card code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cmd-card span{color:var(--hint);font-size:12px}.command-detail{margin-top:12px;padding:14px;background:rgba(36,129,204,.07);border:1px solid var(--line);border-radius:15px}.code-card{padding:15px}.code-card .code{max-height:380px}.badge{display:inline-block;background:rgba(36,129,204,.15);color:var(--accent);padding:5px 8px;border-radius:999px;font-size:11px}.bar{height:12px;background:rgba(148,163,184,.2);border-radius:999px;overflow:hidden;margin:12px 0}.fill{height:100%;background:var(--accent)}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{padding:14px}.stat b{display:block;font-size:22px}.admin-head{display:flex;gap:8px;margin:10px 0}.search{flex:1;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px;outline:none}.users{display:grid;gap:9px}.user-card{padding:14px}.user-top{display:flex;justify-content:space-between;gap:8px}.user-id{font-size:11px;color:var(--hint)}.user-tab{margin:9px 0;padding:9px;border-radius:12px;background:rgba(148,163,184,.08);font-size:12px;overflow-wrap:anywhere}.user-actions{display:flex;gap:7px;flex-wrap:wrap}.detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}.view-row{padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}.option{width:100%;text-align:left;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);margin-top:8px}.option.correct{border:2px solid #22c55e}.option.wrong{border:2px solid #ef4444}.feedback{margin-top:12px;padding:12px;border-radius:14px;background:rgba(36,129,204,.08)}.training-module{padding:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:10px}.practice-tabs{display:flex;gap:7px;overflow-x:auto;margin:10px 0 14px}.subtab{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:9px 12px;white-space:nowrap}.subtab.active{background:var(--accent);color:var(--accentText)}.task-meta{display:flex;gap:8px;align-items:center;margin-bottom:8px}.task-solution{margin-top:12px}.empty,.spinner{text-align:center;padding:30px;color:var(--hint)}.bottom{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 95%,transparent);backdrop-filter:blur(15px);border-top:1px solid var(--line);padding:7px 8px calc(7px + env(safe-area-inset-bottom));z-index:20}.tabs{max-width:820px;margin:auto;display:flex;overflow-x:auto;gap:5px}.tab{border:0;background:transparent;color:var(--hint);min-width:70px;flex:1;padding:8px 7px;border-radius:12px;font-size:10px}.tab.active{background:var(--card);color:var(--text)}.tab b{display:block;font-size:17px}@media(max-width:560px){.grid{grid-template-columns:1fr}.tab{min-width:64px}}
+:root{
+  --bg:var(--tg-theme-bg-color,#0b1220);
+  --card:var(--tg-theme-secondary-bg-color,#111c30);
+  --text:var(--tg-theme-text-color,#f8fafc);
+  --hint:var(--tg-theme-hint-color,#94a3b8);
+  --accent:var(--tg-theme-button-color,#2481cc);
+  --accentText:var(--tg-theme-button-text-color,#fff);
+  --line:rgba(148,163,184,.16);
+  --good:#22c55e;--bad:#ef4444;--warn:#f59e0b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding-bottom:98px}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.app{max-width:980px;margin:auto;padding:14px}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;position:sticky;top:0;padding-top:4px;background:linear-gradient(var(--bg) 85%,transparent);z-index:10}
+.brand{font-weight:900;font-size:20px}
+.user{color:var(--hint);font-size:12px;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero,.card,.lesson,.cmd-card,.code-card,.user-card,.stat,.support-card,.ticket,.learn-block{background:var(--card);border:1px solid var(--line);border-radius:18px}
+.hero{padding:18px;margin-bottom:12px}
+.hero h1,.hero h2,.hero h3{margin-top:0}
+.hero p,.card p,.small,.muted{color:var(--hint)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.card{padding:15px;min-height:108px}
+.clickable{cursor:pointer}
+.card h3{margin:0 0 8px;font-size:16px}
+.badge{display:inline-block;background:rgba(36,129,204,.15);color:var(--accent);padding:5px 8px;border-radius:999px;font-size:11px}
+.section-head{display:flex;align-items:center;gap:9px;margin:7px 0 13px}
+.section-head h2{margin:0;flex:1;font-size:21px}
+.back,.ghost,.primary,.danger{border:0;border-radius:12px;padding:10px 12px}
+.back,.ghost{background:var(--card);color:var(--text);border:1px solid var(--line)}
+.primary{background:var(--accent);color:var(--accentText)}
+.danger{background:var(--bad);color:white}
+.lesson{padding:16px}
+.lesson-body{line-height:1.72;font-size:15px;overflow-wrap:anywhere}
+.lesson-body hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.lesson-body code,.code{display:block;white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.24);padding:12px;border-radius:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.46}
+.command-list{display:grid;gap:8px;margin-top:10px}
+.cmd-card{padding:13px;text-align:left;color:var(--text);width:100%}
+.cmd-card code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmd-card span{display:block;color:var(--hint);font-size:12px;margin-top:4px}
+.command-detail{margin-top:12px;padding:14px;background:rgba(36,129,204,.07);border:1px solid var(--line);border-radius:15px}
+.chips,.practice-tabs,.filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px}
+.chip,.subtab,.filter{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:9px 12px;white-space:nowrap}
+.chip.active,.subtab.active,.filter.active{background:var(--accent);color:var(--accentText)}
+.bar{height:12px;background:rgba(148,163,184,.2);border-radius:999px;overflow:hidden;margin:11px 0}
+.fill{height:100%;background:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.stat{padding:13px}.stat b{display:block;font-size:21px}.stat span{display:block;color:var(--hint);font-size:11px}
+.search,.textarea{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:11px;outline:none}
+.textarea{min-height:130px;resize:vertical}
+.admin-head{display:flex;gap:8px;margin:10px 0}
+.user-card{padding:14px}.user-id{font-size:11px;color:var(--hint);margin-top:2px}
+.user-tab{margin:9px 0;padding:9px;border-radius:12px;background:rgba(148,163,184,.08);font-size:12px;overflow-wrap:anywhere}
+.user-actions{display:flex;gap:7px;flex-wrap:wrap}
+.detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.view-row{padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+.option{width:100%;text-align:left;padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);margin-top:8px}
+.option.correct{border:2px solid var(--good)} .option.wrong{border:2px solid var(--bad)} .option:disabled{opacity:.95}
+.feedback{margin-top:12px;padding:12px;border-radius:14px;background:rgba(36,129,204,.08)}
+.task-solution{margin-top:12px}
+.training-module,.learn-block{padding:14px;margin-bottom:9px}
+.training-module b{display:block;margin-bottom:6px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:7px;font-size:12px}
+.ticket{padding:14px;margin-bottom:9px}
+.ticket.open{border-left:4px solid var(--warn)}
+.ticket.answered{border-left:4px solid var(--good)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:100}
+.modal-backdrop.show{display:flex}
+.modal{width:min(680px,100%);background:var(--bg);border:1px solid var(--line);border-radius:22px 22px 0 0;padding:16px;box-shadow:0 -15px 40px rgba(0,0,0,.35)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modal-actions{display:flex;gap:8px;margin-top:10px}.modal-actions>*{flex:1}
+.empty,.spinner{text-align:center;padding:30px;color:var(--hint)}
+.bottom{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:7px 7px calc(7px + env(safe-area-inset-bottom));z-index:50}
+.tabs{max-width:980px;margin:auto;display:flex;overflow-x:auto;gap:4px}
+.tab{border:0;background:transparent;color:var(--hint);min-width:64px;flex:1;padding:8px 5px;border-radius:12px;font-size:10px}
+.tab.active{background:var(--card);color:var(--text)}
+.tab b{display:block;font-size:17px}
+.toast{position:fixed;left:50%;bottom:108px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;z-index:120;display:none;max-width:90%}
+.toast.show{display:block}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.tab{min-width:70px}}
 </style>
 </head>
 <body>
-<div class="app"><div class="top"><div class="brand">🐍 Python Academy</div><div class="user" id="userName">Telegram</div></div><main id="content"><div class="spinner">Загрузка…</div></main></div>
-<div class="bottom"><div class="tabs"><button class="tab" data-tab="learn"><b>🐍</b>Обучение</button><button class="tab" data-tab="course"><b>📚</b>Курс</button><button class="tab" data-tab="frameworks"><b>🧩</b>Фреймворки</button><button class="tab" data-tab="libraries"><b>📦</b>Библиотеки</button><button class="tab" data-tab="practice"><b>🧪</b>Практика</button><button class="tab" data-tab="progress"><b>📊</b>Прогресс</button><button class="tab" data-tab="admin" id="adminTab" style="display:none"><b>🛠</b>Админ</button></div></div>
+<div class="app">
+  <div class="top">
+    <div class="brand">🐍 Python Academy <span class="badge" id="buildVersion">v11</span></div>
+    <div class="user" id="userName">Telegram</div>
+  </div>
+  <main id="content"><div class="spinner">Открываем приложение…</div></main>
+</div>
+
+<div class="bottom">
+  <div class="tabs">
+    <button class="tab" data-tab="learn"><b>🐍</b>Обучение</button>
+    <button class="tab" data-tab="course"><b>📚</b>Курс</button>
+    <button class="tab" data-tab="frameworks"><b>🧩</b>Фреймворки</button>
+    <button class="tab" data-tab="libraries"><b>📦</b>Библиотеки</button>
+    <button class="tab" data-tab="practice"><b>🧪</b>Практика</button>
+    <button class="tab" data-tab="progress"><b>📊</b>Прогресс</button>
+    <button class="tab" data-tab="support"><b>🆘</b>Поддержка</button>
+    <button class="tab" data-tab="admin" id="adminTab" style="display:none"><b>🛠</b>Админ</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">Сообщение</h3><button class="ghost" id="modalClose">✕</button></div>
+    <textarea id="modalText" class="textarea" maxlength="4000" placeholder="Введите сообщение..."></textarea>
+    <div class="modal-actions"><button class="ghost" id="modalCancel">Отмена</button><button class="primary" id="modalSend">Отправить</button></div>
+    <div class="small" id="modalHint"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
 <script>
-const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
-const state={course:{},frameworks:{},libraries:{},miniCodes:{},learning:[],tasks:[],quizzes:[],total:0,isAdmin:false};
-const $=id=>document.getElementById(id),content=$("content");let adminTimer=null;
-async function api(path,options={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),12000);try{const headers={"Content-Type":"application/json",...(options.headers||{})};if(tg?.initData)headers["X-Telegram-Init-Data"]=tg.initData;const r=await fetch(path,{...options,headers,signal:c.signal});const d=await r.json().catch(()=>({}));if(!r.ok){const msg=d.reason?`${d.error||`HTTP ${r.status}`} ${d.reason}`:(d.error||`HTTP ${r.status}`);throw new Error(msg)}return d}catch(e){if(e.name==="AbortError")throw new Error("Сервер не ответил за 12 секунд");throw e}finally{clearTimeout(timer)}}
-const h=v=>String(v??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function setActive(n){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===n))}async function track(n){if(!tg?.initData)return;try{await api('/api/tab',{method:'POST',body:JSON.stringify({initData:tg.initData,tab:String(n).slice(0,200)})})}catch(e){}}
-function screen(n){setActive(n);track(n)}function header(t,back=true){return `<div class="section-head">${back?'<button class="back" id="backBtn">← Назад</button>':''}<h2>${t}</h2></div>`}async function copyText(x){try{await navigator.clipboard.writeText(x);alert('Скопировано')}catch{alert('Не удалось скопировать')}}
-function courseHome(){screen('course');const a=Object.entries(state.course);content.innerHTML=`<section class="hero"><h1>📚 Курс Python</h1><p>${a.length} разделов · ${state.total} тем</p></section><div class="grid">${a.map(([n,s])=>`<div class="card" data-section="${n}"><h3>${h(s.title)}</h3><p>${s.topics.length} тем</p></div>`).join('')}</div>`;document.querySelectorAll('[data-section]').forEach(x=>x.onclick=()=>openSection(+x.dataset.section))}
-function openSection(n){const s=state.course[n];if(!s)return;screen(`section:${n}`);content.innerHTML=header(h(s.title))+`<div class="grid">${s.topics.map((t,i)=>`<div class="topic" data-topic="${i}"><strong>📖 ${i+1}. ${h(t)}</strong><span>Открыть</span></div>`).join('')}</div>`;$('backBtn').onclick=courseHome;document.querySelectorAll('[data-topic]').forEach(x=>x.onclick=()=>openLesson(n,+x.dataset.topic))}
-async function openLesson(n,i){const t=state.course[n]?.topics?.[i];if(!t)return;screen(`lesson:${n}:${i}`);content.innerHTML=`<div class="spinner">Загрузка «${h(t)}»…</div>`;try{const d=await api(`/api/lesson/${n}/${i}`);content.innerHTML=header(`📖 ${h(d.topic)}`)+`<article class="lesson"><div class="lesson-body">${d.html}</div></article>`;$('backBtn').onclick=()=>openSection(n)}catch(e){content.innerHTML=`<div class="empty">Ошибка: ${h(e.message)}</div>`}}
-function itemsHome(type){screen(type==='framework'?'frameworks':'libraries');const s=type==='framework'?state.frameworks:state.libraries;content.innerHTML=header(type==='framework'?'🧩 Фреймворки':'📦 Библиотеки',false)+`<div class="hero"><p>Выбирай элемент. Внутри нажимай на любую команду — увидишь, что она делает.</p></div><div class="grid">${Object.entries(s).map(([k,d])=>`<div class="card" data-item="${h(k)}"><h3>${h(d.name)}</h3><p>${(d.commands||[]).length} команд</p></div>`).join('')}</div>`;document.querySelectorAll('[data-item]').forEach(x=>x.onclick=()=>openItem(type,x.dataset.item))}
-function frameworksHome(){itemsHome('framework')}function librariesHome(){itemsHome('library')}
-function openItem(type,key){const s=type==='framework'?state.frameworks:state.libraries,d=s[key];if(!d)return;screen(`${type}:${key}`);content.innerHTML=header(h(d.name))+`<article class="lesson">${d.logo?`<img src="${h(d.logo)}" alt="${h(d.name)}">`:''}<div class="lesson-body">${d.desc}</div>${d.url?`<a class="action" href="${h(d.url)}" target="_blank" rel="noopener">🔗 Официальный сайт</a>`:''}<h3>🧭 Команды</h3><div class="command-list">${(d.commands||[]).map((c,i)=>`<button class="cmd-card" data-cmd="${i}"><code>${h(c[0])}</code><span>${h(c[1])}</span></button>`).join('')}</div><div id="commandDetail"></div></article>`;$('backBtn').onclick=type==='framework'?frameworksHome:librariesHome;document.querySelectorAll('[data-cmd]').forEach(x=>x.onclick=()=>showCommand(type,key,+x.dataset.cmd))}
-function showCommand(type,key,i){const d=(type==='framework'?state.frameworks:state.libraries)[key],c=d?.commands?.[i];if(!c)return;screen(`${type}:${key}:command:${i}`);$('commandDetail').innerHTML=`<div class="command-detail"><h3>Что делает</h3><div class="small">${h(c[1])}</div><pre class="code">${h(c[0])}</pre><button class="primary" id="copyCmd">📋 Скопировать</button></div>`;$('copyCmd').onclick=()=>copyText(c[0])}
+const tg=window.Telegram?.WebApp;
+tg?.ready(); tg?.expand();
+
+const state={
+  course:{},frameworks:{},libraries:{},frameworkGroups:[],libraryGroups:[],
+  miniCodes:{},learning:[],tasks:[],quizzes:[],total:0,isAdmin:false,quizScore:0,
+  lastTab:'learn'
+};
+const $=id=>document.getElementById(id), content=$("content");
+const h=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let modalAction=null, adminFilter="all", currentModalMeta="";
+
+async function api(path,options={}){
+  const c=new AbortController(), timer=setTimeout(()=>c.abort(),12000);
+  try{
+    const headers={"Content-Type":"application/json",...(options.headers||{})};
+    if(tg?.initData) headers["X-Telegram-Init-Data"]=tg.initData;
+    const r=await fetch(path,{...options,headers,signal:c.signal,cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const msg=d.reason?`${d.error||`HTTP ${r.status}`} — ${d.reason}`:(d.error||`HTTP ${r.status}`);
+      throw new Error(msg);
+    }
+    return d;
+  }catch(e){
+    if(e.name==="AbortError") throw new Error("Сервер не ответил за 12 секунд");
+    throw e;
+  }finally{clearTimeout(timer)}
+}
+
+function toast(msg){
+  const el=$("toast");el.textContent=msg;el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"),2500);
+}
+function setActive(name){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===name))}
+async function track(name){
+  state.lastTab=String(name).slice(0,200);
+  if(!tg?.initData) return;
+  try{await api("/api/tab",{method:"POST",body:JSON.stringify({initData:tg.initData,tab:state.lastTab})})}catch{}
+}
+function screen(name){setActive(name.split(":")[0]);track(name)}
+function header(title,back=true){
+  return `<div class="section-head">${back?'<button class="back" id="backBtn">← Назад</button>':''}<h2>${h(title)}</h2></div>`;
+}
+async function copyText(x){try{await navigator.clipboard.writeText(x);toast("Код скопирован")}catch{toast("Не удалось скопировать код")}}
+function escapeAttr(x){return h(x).replace(/`/g,"&#96;")}
+
+// ---------- ОБУЧЕНИЕ ----------
+const learnExtra={
+  start:{
+    why:"Python проще изучать, когда ты понимаешь модель выполнения: код идёт сверху вниз, выражения вычисляются, переменные хранят значения, функции группируют действия.",
+    theory:[
+      "Каждая строка должна быть понятна по трём вопросам: что создаётся, что изменяется и что выводится.",
+      "Тип данных определяет доступные операции. Ошибка типов часто означает, что две части программы говорят на разных «языках».",
+      "input() всегда возвращает строку, поэтому для числовых вычислений обычно нужен int() или float()."
+    ],
+    example:'name = input("Имя: ").strip()\nage = int(input("Возраст: "))\nnext_year = age + 1\nprint(f"{name}, через год тебе {next_year}")',
+    mistakes:["Пытаться сложить строку и число без преобразования.","Путать значение переменной и текст с таким же написанием.","Копировать пример без эксперимента с входными данными."],
+    practice:"Сделай программу «анкета»: имя, город, возраст. Выведи аккуратный профиль пользователя."
+  },
+  logic:{
+    why:"Алгоритм начинается не с синтаксиса, а с условий и повторений. Если ты можешь описать решение словами, его проще записать в Python.",
+    theory:[
+      "if проверяет условие, elif добавляет ветвь, else покрывает оставшийся случай.",
+      "for удобен, когда перебираешь коллекцию или известный диапазон; while — когда условие окончания важнее количества шагов.",
+      "list хранит порядок, set — уникальность, dict — связь ключ→значение."
+    ],
+    example:'numbers = [4, 7, 10, 13]\nfor n in numbers:\n    if n % 2 == 0:\n        print(n, "чётное")\n    else:\n        print(n, "нечётное")',
+    mistakes:["Бесконечный while без изменения условия.","Неправильный отступ внутри if или for.","Использование индекса там, где достаточно for element in collection."],
+    practice:"Напиши меню из трёх команд: добавить число, показать числа, выйти."
+  },
+  strings:{
+    why:"Строки встречаются в логинах, файлах, сообщениях, URL, JSON и командах. Владение строками резко упрощает реальные задачи.",
+    theory:[
+      "Строки неизменяемы: методы вроде replace() возвращают новую строку.",
+      "split() превращает строку в список, join() собирает список строк обратно.",
+      "Сначала очищай ввод strip(), затем нормализуй регистр lower(), потом проверяй содержание."
+    ],
+    example:'raw = "  Python,Flask,Django  "\nparts = [x.strip().lower() for x in raw.strip().split(",")]\nprint(parts)',
+    mistakes:["Забыть, что upper()/lower()/replace() возвращают новую строку.","Ожидать, что split() изменит исходную строку.","Смешивать очистку данных и бизнес-логику в одну нечитаемую строку."],
+    practice:"Сделай мини-парсер команды вида «/add Имя 14»: отдели команду от аргументов."
+  },
+  functions:{
+    why:"Функции позволяют строить программу из маленьких частей. Это один из главных переходов от учебных скриптов к нормальным проектам.",
+    theory:[
+      "Параметр — имя, указанное в определении функции; аргумент — конкретное значение при вызове.",
+      "return передаёт результат наружу. print() только показывает результат пользователю.",
+      "Функция с одной понятной ответственностью легче тестируется и переиспользуется."
+    ],
+    example:'def calculate_total(price, count, discount=0):\n    subtotal = price * count\n    return subtotal * (1 - discount / 100)\n\nprint(calculate_total(100, 3, 10))',
+    mistakes:["Функция меняет слишком много состояний.","Использование global там, где можно вернуть значение.","Слишком длинная функция без понятных этапов."],
+    practice:"Раздели простой калькулятор на функции input_data(), calculate() и show_result()."
+  },
+  collections:{
+    why:"Большинство прикладных программ работают с наборами данных. Выбор структуры часто важнее знания отдельного метода.",
+    theory:[
+      "list — последовательность с индексами; dict — быстрый доступ по ключу; set — уникальные элементы; tuple — неизменяемая последовательность.",
+      "comprehension полезен для коротких преобразований и фильтрации, но читаемость важнее компактности.",
+      "copy() создаёт новый список верхнего уровня; вложенные объекты внутри могут оставаться общими."
+    ],
+    example:'users = [{"name":"A","age":17},{"name":"B","age":22}]\nadults = [u["name"] for u in users if u["age"] >= 18]\nprint(adults)',
+    mistakes:["Удаление элементов из списка во время его же перебора.","Неверное понимание разницы == и is.","Использование списка для задач, где нужен быстрый доступ по ключу."],
+    practice:"Сделай мини-телефонную книгу на dict: добавить, найти, удалить, показать всех."
+  },
+  errors:{
+    why:"Ошибки неизбежны. Профессиональный навык — быстро определить тип проблемы и локализовать её.",
+    theory:[
+      "SyntaxError — Python не может разобрать код; TypeError — операция не подходит типам; ValueError — тип подходящий, но значение некорректно.",
+      "try/except обрабатывает ожидаемые ошибки на границе ввода и внешних ресурсов.",
+      "with для файлов помогает корректно освобождать ресурс."
+    ],
+    example:'try:\n    age = int(input("Возраст: "))\nexcept ValueError:\n    print("Нужно ввести целое число")',
+    mistakes:["Голый except, который скрывает настоящие ошибки.","Игнорирование текста traceback.","Открывать файл и забывать его закрыть."],
+    practice:"Напиши CLI-заметки, которые сохраняются в JSON и переживают перезапуск программы."
+  },
+  modules:{
+    why:"Когда проект становится больше одного файла, модули и виртуальные окружения становятся обязательной базовой гигиеной.",
+    theory:[
+      "import подключает модуль; from ... import — конкретное имя; as задаёт псевдоним.",
+      "venv изолирует зависимости проекта от системного Python.",
+      "requirements.txt фиксирует список зависимостей для воспроизводимой установки."
+    ],
+    example:'from pathlib import Path\n\nDATA = Path("data") / "users.json"\nprint(DATA.exists())',
+    mistakes:["Устанавливать пакеты глобально для каждого проекта.","Смешивать зависимости разных проектов.","Называть свой файл так же, как стандартный модуль, например random.py."],
+    practice:"Создай проект из main.py, helpers.py и config.py и установи одну внешнюю библиотеку в venv."
+  },
+  oop:{
+    why:"ООП полезно, когда у сущности есть состояние и связанные с ним действия. Это инструмент организации кода, а не обязательный ритуал.",
+    theory:[
+      "class описывает структуру и поведение; экземпляр — конкретный объект.",
+      "self указывает на текущий экземпляр; __init__ устанавливает начальное состояние.",
+      "Наследование следует применять, когда есть реальная связь «является», а не просто ради повторного использования."
+    ],
+    example:'class BankAccount:\n    def __init__(self, balance=0):\n        self.balance = balance\n\n    def deposit(self, amount):\n        self.balance += amount',
+    mistakes:["Сделать класс ради каждой переменной.","Раздать объекту слишком много обязанностей.","Менять внутреннее состояние из десятков разных мест."],
+    practice:"Сделай классы Product и Cart: добавление товара, удаление, общая стоимость."
+  },
+  advanced:{
+    why:"Продвинутые конструкции помогают писать ленивый, переиспользуемый и выразительный код, но их нужно изучать после крепкой базы.",
+    theory:[
+      "Итератор выдаёт элементы по одному; генератор через yield позволяет не хранить весь результат в памяти.",
+      "Декоратор оборачивает функцию и добавляет поведение.",
+      "map/filter/zip удобны для преобразования данных, но читаемость всегда важнее «магии»."
+    ],
+    example:'def read_numbers():\n    for n in range(5):\n        yield n * n\n\nfor value in read_numbers():\n    print(value)',
+    mistakes:["Использовать генератор, когда данные всё равно нужны целиком.","Сложные цепочки map/filter, которые трудно читать.","Оптимизировать до измерения производительности."],
+    practice:"Сделай генератор, который читает большой текстовый файл построчно и отдаёт только строки с ключевым словом."
+  },
+  async:{
+    why:"Асинхронность особенно полезна там, где программа много ждёт сеть, API, Telegram или другие I/O-операции.",
+    theory:[
+      "async def создаёт корутину; await передаёт управление event loop до готовности операции.",
+      "Task позволяет запускать несколько операций конкурентно.",
+      "async не делает тяжёлые CPU-вычисления автоматически быстрее."
+    ],
+    example:'async def main():\n    a = asyncio.create_task(fetch("https://example.com/a"))\n    b = asyncio.create_task(fetch("https://example.com/b"))\n    return await asyncio.gather(a, b)',
+    mistakes:["Блокирующий requests в асинхронном обработчике.","Забытый await.","Создание тысяч задач без ограничения конкуренции."],
+    practice:"Сделай асинхронную загрузку трёх URL и собери результаты в один список."
+  },
+  webdb:{
+    why:"Здесь Python превращается в серверное приложение: HTTP принимает запрос, код обрабатывает его, база хранит данные.",
+    theory:[
+      "GET обычно получает данные, POST создаёт/передаёт данные; статус HTTP сообщает результат операции.",
+      "SQL делится на операции чтения и изменения; параметры запроса нужно передавать отдельно, а не склеивать строки.",
+      "Веб-фреймворки дают маршрутизацию, middleware, валидацию и структуру приложения."
+    ],
+    example:'SELECT name, age\nFROM users\nWHERE age >= 18\nORDER BY name;',
+    mistakes:["Склеивать пользовательский ввод прямо в SQL.","Не обрабатывать сетевые ошибки и не проверять status_code.","Считать, что ORM отменяет необходимость понимать SQL."],
+    practice:"Спроектируй API для списка задач: GET /tasks, POST /tasks и база SQLite."
+  },
+  telegram:{
+    why:"Telegram-боты объединяют обработчики, состояние, БД и внешние API. Mini App добавляет полноценный UI.",
+    theory:[
+      "Handler отвечает на событие: сообщение, callback, команду.",
+      "FSM удобен для многошаговых диалогов, а Mini App — для сложных интерфейсов.",
+      "Данные Telegram Web App нужно проверять на сервере, прежде чем доверять user_id."
+    ],
+    example:'@dp.message(CommandStart())\nasync def start(message):\n    await message.answer("Привет!")',
+    mistakes:["Хранить BOT_TOKEN в коде.","Доверять client-side user_id без проверки initData.","Смешивать UI-логику Mini App с секретами."
+    ],
+    practice:"Сделай бота, который открывает Mini App, запоминает текущую вкладку и хранит пользователя в SQLite."
+  },
+  quality:{
+    why:"Качественный код можно менять без страха сломать уже работающие части.",
+    theory:[
+      "Тест проверяет ожидаемое поведение. pytest упрощает написание и запуск тестов.",
+      "Mock помогает изолировать внешние сервисы.",
+      "Типы, понятные имена и небольшие функции уменьшают количество случайных ошибок."
+    ],
+    example:'def add(a,b):\n    return a+b\n\ndef test_add():\n    assert add(2,3) == 5',
+    mistakes:["Тестировать только счастливый путь.","Делать тесты зависимыми друг от друга.","Проверять внутреннюю реализацию вместо поведения."],
+    practice:"Покрой тестами калькулятор: сложение, деление на ноль, неверный ввод."
+  },
+  projects:{
+    why:"Уровень растёт быстрее, когда ты доводишь проекты до конца: структура, README, зависимости, тесты и деплой.",
+    theory:[
+      "Проект начинай с задачи и пользовательского сценария, а затем разбивай на части.",
+      "Git нужен не только для бэкапа: коммиты показывают эволюцию решения.",
+      "Хороший README объясняет установку, запуск, пример использования и ограничения."
+    ],
+    example:'python -m venv .venv\n# активируй окружение\npip install -r requirements.txt\npython main.py',
+    mistakes:["Пытаться сразу сделать огромную систему.","Откладывать документацию и деплой на самый конец.","Не сохранять рабочие промежуточные версии."],
+    practice:"Выбери один проект из Мини-кодов и расширь его до законченного приложения с README."
+  }
+};
+
 function learningHome(){
-  screen('learning');
-  content.innerHTML=header('🐍 Обучение Python с нуля до профи',false)+`<section class="hero"><h1>Маршрут разработчика</h1><p>Иди по этапам от первых строк кода до реальных проектов. В каждом этапе есть темы и советы.</p></section><div class="grid">${state.learning.map((s,i)=>`<div class="card" data-stage="${i}"><span class="badge">${h(s.level)}</span><h3 style="margin:8px 0">${h(s.title)}</h3><p>${h(s.description)}</p><span class="small">${s.modules.length} модуля · ${s.tips.length} советов</span></div>`).join('')}</div>`;
-  document.querySelectorAll('[data-stage]').forEach(x=>x.onclick=()=>openLearning(+x.dataset.stage));
+  screen("learn");
+  content.innerHTML=header("🐍 Обучение Python: от нуля до профи",false)+
+  `<section class="hero"><h1>Дорожная карта разработчика</h1>
+  <p>Не просто список тем: каждый этап показывает, что понять, что потренировать, каких ошибок избегать и какой проект сделать.</p>
+  <div class="stats">
+    <div class="stat"><b>${state.learning.length}</b><span>этапов</span></div>
+    <div class="stat"><b>${state.total}</b><span>тем курса</span></div>
+    <div class="stat"><b>${state.tasks.length}</b><span>практических задач</span></div>
+  </div></section>
+  <div class="grid">${state.learning.map((s,i)=>`<div class="card clickable" data-stage="${i}">
+    <span class="badge">${h(s.level)}</span><h3 style="margin:8px 0">${h(s.title)}</h3>
+    <p>${h(s.description)}</p><span class="small">${s.modules.length} модуля · ${s.modules.reduce((a,m)=>a+m.topics.length,0)} тем</span>
+  </div>`).join("")}</div>`;
+  document.querySelectorAll("[data-stage]").forEach(x=>x.onclick=()=>openLearning(+x.dataset.stage));
 }
 function openLearning(i){
   const s=state.learning[i];if(!s)return;
-  screen(`learning:${s.id}`);
-  content.innerHTML=header(h(s.title))+`<section class="lesson"><span class="badge">${h(s.level)}</span><p class="small">${h(s.description)}</p><h3>📚 Что изучить</h3>${s.modules.map(m=>`<div class="training-module"><b>${h(m.title)}</b><div class="small" style="margin-top:8px">${m.topics.map(t=>h(t)).join(' · ')}</div></div>`).join('')}<h3>💡 Советы</h3><div class="training-module">${s.tips.map(t=>`<div style="margin:7px 0">• ${h(t)}</div>`).join('')}</div></section>`;
-  $('backBtn').onclick=learningHome;
+  screen(`learn:${s.id}`);
+  const e=learnExtra[s.id]||{};
+  content.innerHTML=header(s.title)+`
+    <section class="lesson">
+      <span class="badge">${h(s.level)}</span>
+      <p>${h(s.description)}</p>
+      ${e.why?`<div class="learn-block"><h3>🎯 Зачем это нужно</h3><p>${h(e.why)}</p></div>`:""}
+      <h3>📚 Что изучить</h3>
+      ${s.modules.map(m=>`<div class="training-module"><b>${h(m.title)}</b><div class="small">${m.topics.map(t=>`• ${h(t)}`).join("<br>")}</div></div>`).join("")}
+      ${e.theory?`<div class="learn-block"><h3>🧠 Глубокое понимание</h3>${e.theory.map(x=>`<p>• ${h(x)}</p>`).join("")}</div>`:""}
+      ${e.example?`<div class="learn-block"><h3>💻 Пример</h3><pre class="code">${h(e.example)}</pre><button class="ghost" id="copyLearn">📋 Скопировать</button></div>`:""}
+      <div class="learn-block"><h3>💡 Советы</h3>${(s.tips||[]).map(t=>`<p>• ${h(t)}</p>`).join("")}${e.mistakes?`<h4>⚠️ Частые ошибки</h4>${e.mistakes.map(x=>`<p>• ${h(x)}</p>`).join("")}`:""}</div>
+      ${e.practice?`<div class="learn-block"><h3>🧪 Что сделать самому</h3><p>${h(e.practice)}</p></div>`:""}
+      <div class="feedback"><b>✅ Контрольная точка</b><br>${h(s.checkpoint||"Закрепи этап практикой.")}</div>
+    </section>`;
+  $("backBtn").onclick=learningHome;
+  if($("copyLearn"))$("copyLearn").onclick=()=>copyText(e.example);
 }
+
+// ---------- КУРС ----------
+function courseHome(){
+  screen("course");
+  const a=Object.entries(state.course);
+  content.innerHTML=`<section class="hero"><h1>📚 Курс Python</h1><p>${a.length} разделов · ${state.total} тем</p><p class="small">Открывай тему: внутри будет основной материал, пример и дополнительные пояснения из базы уроков.</p></section>
+  <div class="grid">${a.map(([n,s])=>`<div class="card clickable" data-section="${n}"><h3>${h(s.title)}</h3><p>${s.topics.length} тем</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-section]").forEach(x=>x.onclick=()=>openSection(+x.dataset.section));
+}
+function openSection(n){
+  const s=state.course[n];if(!s)return;screen(`section:${n}`);
+  content.innerHTML=header(s.title)+`<div class="grid">${s.topics.map((t,i)=>`<div class="card clickable" data-topic="${i}"><h3>📖 ${i+1}. ${h(t)}</h3><p>Открыть подробный материал →</p></div>`).join("")}</div>`;
+  $("backBtn").onclick=courseHome;
+  document.querySelectorAll("[data-topic]").forEach(x=>x.onclick=()=>openLesson(n,+x.dataset.topic));
+}
+async function openLesson(n,i){
+  const t=state.course[n]?.topics?.[i];if(!t)return;screen(`lesson:${n}:${i}`);
+  content.innerHTML=`<div class="spinner">Загружаем урок «${h(t)}»…</div>`;
+  try{
+    const d=await api(`/api/lesson/${n}/${i}`);
+    content.innerHTML=header(`📖 ${d.topic}`)+`<article class="lesson"><div class="lesson-body">${d.html}</div></article><div style="margin-top:10px"><button class="primary" id="lessonPractice">🧪 Перейти в практику</button></div>`;
+    $("backBtn").onclick=()=>openSection(n);
+    $("lessonPractice").onclick=()=>practiceHome("tasks");
+  }catch(e){content.innerHTML=`<div class="empty">Ошибка: ${h(e.message)}</div>`}
+}
+
+// ---------- КАТАЛОГИ ----------
+function catalogHome(type,category=null){
+  screen(type==="framework"?"frameworks":"libraries");
+  const groups=type==="framework"?state.frameworkGroups:state.libraryGroups;
+  const data=type==="framework"?state.frameworks:state.libraries;
+  const title=type==="framework"?"🧩 Фреймворки":"📦 Библиотеки";
+  const allCount=Object.keys(data).length;
+  let body="";
+  if(category){
+    const group=groups.find(x=>x.id===category);
+    const shown=Object.entries(data).filter(([_,d])=>d.category===category);
+    body=`<section class="hero"><span class="badge">${h(group?.title||category)}</span><h3 style="margin:10px 0">${h(group?.description||"")}</h3>
+      <div class="grid">${shown.map(([k,d])=>`<div class="card clickable" data-item="${escapeAttr(k)}"><h3>${h(d.name)}</h3><p>${h(d.desc)}</p><span class="small">${(d.commands||[]).length} команд · открыть →</span></div>`).join("")||'<div class="empty">Пока пусто.</div>'}</div></section>`;
+  }else{
+    body=`<section class="hero"><h3>${title}</h3><p>Всего: <b>${allCount}</b>. Нажми направление — увидишь только относящиеся к нему технологии.</p>
+      <div class="grid">${groups.map(g=>`<div class="card clickable" data-cat="${escapeAttr(g.id)}"><span class="badge">${g.items.length} шт.</span><h3 style="margin-top:8px">${h(g.title)}</h3><p>${h(g.description)}</p></div>`).join("")}</div></section>`;
+  }
+  const chips=groups.map(g=>`<button class="chip ${g.id===category?"active":""}" data-cat="${escapeAttr(g.id)}">${h(g.title)}</button>`).join("")+
+    `<button class="chip ${!category?"active":""}" id="catAll">Все</button>`;
+  content.innerHTML=header(title,false)+`<div class="chips">${chips}</div>${body}`;
+  document.querySelectorAll("[data-cat]").forEach(x=>x.onclick=()=>catalogHome(type,x.dataset.cat));
+  if($("catAll"))$("catAll").onclick=()=>catalogHome(type,null);
+  document.querySelectorAll("[data-item]").forEach(x=>x.onclick=()=>openCatalogItem(type,x.dataset.item,category));
+}
+function openCatalogItem(type,key,category){
+  const data=type==="framework"?state.frameworks[key]:state.libraries[key];if(!data)return;
+  screen(`${type}:${key}`);
+  const commands=data.commands||[];
+  content.innerHTML=header(data.name)+`<article class="lesson">
+    ${data.logo?`<img src="${h(data.logo)}" alt="" style="width:100%;max-height:190px;object-fit:contain;background:#fff;border-radius:14px;margin-bottom:10px">`:""}
+    <p>${h(data.desc)}</p>
+    <div class="chips"><span class="badge">${h(type==="framework"?"Фреймворк":"Библиотека")}</span><span class="badge">${commands.length} команд</span></div>
+    <div class="command-list"><h3>🧭 Команды и методы</h3>
+      ${commands.map((c,i)=>`<button class="cmd-card" data-command="${i}"><code>${h(c[0])}</code><span>${h(c[1])}</span></button>`).join("")||"<p class='small'>Команд пока нет.</p>"}
+    </div>
+    <div id="commandDetail"></div>
+    ${data.url?`<p style="margin-top:14px"><a class="primary" style="display:inline-block;text-decoration:none" href="${h(data.url)}" target="_blank">🔗 Официальная документация</a></p>`:""}
+  </article>`;
+  $("backBtn").onclick=()=>catalogHome(type,category);
+  document.querySelectorAll("[data-command]").forEach(x=>x.onclick=()=>{
+    const c=commands[+x.dataset.command];
+    $("commandDetail").innerHTML=`<div class="command-detail"><b>${h(c[0])}</b><p>${h(c[1])}</p><button class="ghost" id="copyCommand">📋 Скопировать</button><div class="small" style="margin-top:8px">Изучи синтаксис, затем попробуй изменить аргументы и проверить поведение.</div></div>`;
+    $("copyCommand").onclick=()=>copyText(c[0]);
+  });
+}
+
+// ---------- ПРАКТИКА ----------
 function practiceShell(active){
-  return `<div class="practice-tabs"><button class="subtab ${active==='tasks'?'active':''}" id="ptasks">📝 Задания</button><button class="subtab ${active==='quiz'?'active':''}" id="pquiz">🧠 Викторина</button><button class="subtab ${active==='mini'?'active':''}" id="pmini">💡 Мини-коды</button></div>`;
+  return `<div class="practice-tabs">
+    <button class="subtab ${active==="tasks"?"active":""}" data-practice="tasks">📝 Задания</button>
+    <button class="subtab ${active==="quiz"?"active":""}" data-practice="quiz">🧠 Викторина</button>
+    <button class="subtab ${active==="mini"?"active":""}" data-practice="mini">💡 Мини-коды</button>
+  </div>`;
 }
-function practiceHome(active='tasks'){
-  screen('practice');
-  content.innerHTML=header('🧪 Практика и задания',false)+practiceShell(active)+`<div id="practiceContent"></div>`;
-  $('ptasks').onclick=()=>practiceHome('tasks');$('pquiz').onclick=()=>practiceHome('quiz');$('pmini').onclick=()=>practiceHome('mini');
-  if(active==='tasks') renderTasks(); else if(active==='quiz') quizHome(); else miniHome();
+function practiceHome(active="tasks"){
+  screen("practice");content.innerHTML=header("🧪 Практика и задания",false)+practiceShell(active)+`<div id="practiceContent"></div>`;
+  document.querySelectorAll("[data-practice]").forEach(x=>x.onclick=()=>practiceHome(x.dataset.practice));
+  if(active==="tasks")renderTasks();else if(active==="quiz")quizHome();else miniHome();
 }
 function renderTasks(){
-  screen('practice:tasks');
-  $('practiceContent').innerHTML=`<div class="hero"><h3>📝 Задания</h3><p>Решай по уровню сложности. Сначала попробуй сам, а потом открой подсказку или решение.</p></div><div class="grid">${state.tasks.map((t,i)=>`<div class="card" data-task="${i}"><div class="task-meta"><span class="badge">${h(t.difficulty)}</span></div><h3>${h(t.title)}</h3><p>${h(t.prompt)}</p></div>`).join('')}</div>`;
-  document.querySelectorAll('[data-task]').forEach(x=>x.onclick=()=>openTask(+x.dataset.task));
+  screen("practice:tasks");
+  $("practiceContent").innerHTML=`<section class="hero"><h3>📝 Практические задания</h3><p>Решай сам, открывай подсказку только после своей попытки, затем сравни с примером решения.</p></section>
+  <div class="grid">${state.tasks.map((t,i)=>`<div class="card clickable" data-task="${i}"><span class="badge">${h(t.difficulty)}</span><h3 style="margin-top:8px">${h(t.title)}</h3><p>${h(t.prompt)}</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-task]").forEach(x=>x.onclick=()=>openTask(+x.dataset.task));
 }
 function openTask(i){
   const t=state.tasks[i];if(!t)return;
-  screen(`practice:task:${t.id}`);
-  $('practiceContent').innerHTML=header(h(t.title))+`<article class="code-card"><div class="task-meta"><span class="badge">${h(t.difficulty)}</span></div><p>${h(t.prompt)}</p><button class="ghost" id="showHint">💡 Показать подсказку</button><div id="hintBox"></div><div class="task-solution"><button class="primary" id="showSolution">✅ Показать пример решения</button><div id="solutionBox"></div></div></article>`;
-  $('backBtn').onclick=()=>practiceHome('tasks');
-  $('showHint').onclick=()=>{ $('hintBox').innerHTML=`<div class="feedback">${h(t.hint)}</div>`; };
-  $('showSolution').onclick=()=>{ $('solutionBox').innerHTML=`<pre class="code">${h(t.solution)}</pre>`; };
+  screen(`task:${t.id}`);
+  $("practiceContent").innerHTML=header(t.title)+`<article class="code-card">
+    <span class="badge">${h(t.difficulty)}</span><p><b>Задание:</b> ${h(t.prompt)}</p>
+    <div class="feedback"><b>💡 Совет</b><br>Сначала составь алгоритм словами. Затем пиши код.</div>
+    <button class="ghost" id="showHint">Подсказка</button><div id="hintBox"></div>
+    <button class="primary" id="markDone" style="margin-top:9px">✅ Отметить как решённое</button>
+    <div class="task-solution"><button class="ghost" id="showSolution">🔎 Показать пример решения</button><div id="solutionBox"></div></div>
+  </article>`;
+  $("backBtn").onclick=()=>practiceHome("tasks");
+  $("showHint").onclick=()=>{$("hintBox").innerHTML=`<div class="feedback">${h(t.hint)}</div>`};
+  $("showSolution").onclick=()=>{$("solutionBox").innerHTML=`<pre class="code">${h(t.solution)}</pre><button class="ghost" id="copyTask">📋 Скопировать</button>`;$("copyTask").onclick=()=>copyText(t.solution)};
+  $("markDone").onclick=async()=>{try{await api("/api/tab",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",tab:`practice:done:${t.id}`})});toast("Задание отмечено");}catch{toast("Не удалось сохранить отметку")}};
 }
 function quizHome(){
-  screen('practice:quiz');
-  $('practiceContent').innerHTML=`<div class="hero"><h3>🧠 Викторина: найди ошибку</h3><p>В каждом вопросе код содержит одну ошибку. Выбери правильное исправление из 4 вариантов.</p></div><div class="grid">${state.quizzes.map((q,i)=>`<div class="card" data-quiz="${i}"><span class="badge">Вопрос ${i+1}</span><h3 style="margin-top:8px">${h(q.title)}</h3><p>Найди одну ошибку в коде.</p></div>`).join('')}</div>`;
-  document.querySelectorAll('[data-quiz]').forEach(x=>x.onclick=()=>openQuiz(+x.dataset.quiz));
+  screen("practice:quiz");
+  $("practiceContent").innerHTML=`<section class="hero"><h3>🧠 Викторина: найди одну ошибку</h3><p>В каждом вопросе есть <b>одна ошибка</b>. Выбери <b>1 из 4 вариантов</b>. После ответа мы покажем разбор.</p><button class="primary" id="startQuiz">▶️ Начать</button></section>
+  <div class="grid">${state.quizzes.map((q,i)=>`<div class="card"><span class="badge">Вопрос ${i+1}</span><h3>${h(q.title)}</h3><p>Найти и исправить одну ошибку.</p></div>`).join("")}</div>`;
+  $("startQuiz").onclick=()=>openQuiz(0);
 }
 async function openQuiz(i){
   const q=state.quizzes[i];if(!q)return;
   screen(`quiz:${q.id}`);
-  $('practiceContent').innerHTML=header(`🧠 ${h(q.title)}`)+`<article class="code-card"><span class="badge">Вопрос ${i+1} из ${state.quizzes.length}</span><pre class="code">${h(q.code)}</pre><h3>Как исправить код?</h3><div id="quizOptions">${q.options.map((o,j)=>`<button class="option" data-option="${j}">${j+1}. ${h(o)}</button>`).join('')}</div><div id="quizFeedback"></div></article>`;
-  $('backBtn').onclick=()=>practiceHome('quiz');
-  document.querySelectorAll('[data-option]').forEach(x=>x.onclick=()=>answerQuiz(q,i,+x.dataset.option));
+  $("practiceContent").innerHTML=header(`🧠 ${q.title}`)+`<article class="code-card"><span class="badge">Вопрос ${i+1} из ${state.quizzes.length}</span><pre class="code">${h(q.code)}</pre><h3>Как исправить ошибку?</h3><div id="quizOptions">${q.options.map((o,j)=>`<button class="option" data-option="${j}">${j+1}. ${h(o)}</button>`).join("")}</div><div id="quizFeedback"></div></article>`;
+  $("backBtn").onclick=()=>practiceHome("quiz");
+  document.querySelectorAll("[data-option]").forEach(x=>x.onclick=()=>answerQuiz(q,i,+x.dataset.option));
 }
 async function answerQuiz(q,i,option){
-  const buttons=[...document.querySelectorAll('[data-option]')];buttons.forEach(b=>b.disabled=true);
+  const buttons=[...document.querySelectorAll("[data-option]")];buttons.forEach(b=>b.disabled=true);
+  let d;
   try{
-    const d=await api('/api/quiz',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',quiz_id:q.id,option_index:option})});
-    buttons.forEach((b,j)=>{if(j===d.correct_option)b.classList.add('correct');if(j===option&&!d.correct)b.classList.add('wrong')});
-    $('quizFeedback').innerHTML=`<div class="feedback"><b>${d.correct?'✅ Правильно!':'❌ Пока неправильно.'}</b><br>${h(d.explanation)}<br><br><button class="primary" id="nextQuiz">${i+1<state.quizzes.length?'Следующий вопрос →':'Вернуться к викторине'}</button></div>`;
-    $('nextQuiz').onclick=()=>i+1<state.quizzes.length?openQuiz(i+1):quizHome();
-  }catch(e){$('quizFeedback').innerHTML=`<div class="feedback">Ошибка проверки: ${h(e.message)}</div>`;buttons.forEach(b=>b.disabled=false)}
+    d=await api("/api/quiz",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",quiz_id:q.id,option_index:option})});
+  }catch(e){
+    // For a temporary network failure, don't fake server persistence.
+    d={correct:option===q.correct,correct_option:q.correct,explanation:`Не удалось записать ответ на сервер: ${e.message}`};
+  }
+  buttons.forEach((b,j)=>{if(j===d.correct_option)b.classList.add("correct");if(j===option&&!d.correct)b.classList.add("wrong")});
+  if(d.correct)state.quizScore++;
+  $("quizFeedback").innerHTML=`<div class="feedback"><b>${d.correct?"✅ Правильно!":"❌ Неверно"}</b><br>${h(d.explanation)}<br><br><b>Счёт в сессии: ${state.quizScore}</b><br><br><button class="primary" id="nextQuiz">${i+1<state.quizzes.length?"Следующий вопрос →":"Завершить"}</button></div>`;
+  $("nextQuiz").onclick=()=>i+1<state.quizzes.length?openQuiz(i+1):quizHome();
 }
-function miniHome(){screen('practice:mini');const a=Object.entries(state.miniCodes);$('practiceContent').innerHTML=`<div class="hero"><h3>💡 Мини-коды</h3><p>Готовые маленькие программы: калькулятор, игры и рисунки turtle.</p></div><div class="grid">${a.map(([k,d])=>`<div class="card" data-mini="${h(k)}"><span class="badge">${h(d.category)}</span><h3 style="margin:8px 0">${h(d.title)}</h3><p>${h(d.description)}</p></div>`).join('')}</div>`;document.querySelectorAll('[data-mini]').forEach(x=>x.onclick=()=>openMini(x.dataset.mini));}
-function openMini(k){const d=state.miniCodes[k];if(!d)return;screen(`practice:mini:${k}`);$('practiceContent').innerHTML=header(h(d.title))+`<article class="code-card"><span class="badge">${h(d.category)}</span><h3>${h(d.title)}</h3><p class="small">${h(d.description)}</p><pre class="code">${h(d.code)}</pre><button class="primary" id="copyCode">📋 Скопировать код</button><p><b>Результат:</b> ${h(d.result)}</p></article>`;$('backBtn').onclick=()=>practiceHome('mini');$('copyCode').onclick=()=>copyText(d.code)}
+function miniHome(){
+  screen("practice:mini");
+  const a=Object.entries(state.miniCodes);
+  $("practiceContent").innerHTML=`<section class="hero"><h3>💡 Мини-коды</h3><p>Короткие проекты: бери готовую основу, меняй код и экспериментируй.</p></section><div class="grid">${a.map(([k,d])=>`<div class="card clickable" data-mini="${escapeAttr(k)}"><span class="badge">${h(d.category)}</span><h3 style="margin-top:8px">${h(d.title)}</h3><p>${h(d.description)}</p></div>`).join("")}</div>`;
+  document.querySelectorAll("[data-mini]").forEach(x=>x.onclick=()=>openMini(x.dataset.mini));
+}
+function openMini(k){
+  const d=state.miniCodes[k];if(!d)return;
+  screen(`practice:mini:${k}`);
+  $("practiceContent").innerHTML=header(d.title)+`<article class="code-card"><span class="badge">${h(d.category)}</span><h3>${h(d.title)}</h3><p>${h(d.description)}</p><pre class="code">${h(d.code)}</pre><button class="primary" id="copyCode">📋 Скопировать код</button><p><b>Что получится:</b> ${h(d.result)}</p></article>`;
+  $("backBtn").onclick=()=>practiceHome("mini");$("copyCode").onclick=()=>copyText(d.code);
+}
 
-async function progressHome(){screen('progress');content.innerHTML='<div class="spinner">Считаем прогресс…</div>';try{const d=await api('/api/progress',{method:'POST',body:JSON.stringify({initData:tg?.initData||''})}),p=d.total?Math.round(d.done/d.total*100):0;content.innerHTML=header('📊 Мой прогресс',false)+`<section class="hero"><b>Пройдено ${d.done} из ${d.total}</b><div class="bar"><div class="fill" style="width:${p}%"></div></div><span class="small">${p}%</span></section><section class="card" style="margin-top:10px"><h3>🧠 Викторина</h3><p>Верных ответов: <b>${d.quiz_correct||0}</b> из ${d.quiz_total||0}</p></section>`}catch(e){content.innerHTML=`<div class="empty">${h(e.message)}</div>`}}
-async function loadAdmin(){if(!state.isAdmin)return;const q=$("adminSearch")?.value||'';try{const d=await api('/api/admin',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',action:'users',query:q})});$("adminTotalUsers").textContent=d.total_users;$("adminTotalViews").textContent=d.total_views;$("adminUsers").innerHTML=d.users.map(u=>`<div class="user-card"><div class="user-top"><div><b>${u.username?`@${h(u.username)}`:'None'}</b><div class="user-id">ID ${h(u.user_id)} · ${h(u.views_count)} действий</div><div class="small">Имя: ${h(u.first_name||'Без имени')}</div></div></div><div class="user-tab"><b>Сейчас:</b> ${h(u.current_tab||'—')}<br><span class="small">${h(u.current_tab_at||u.last_seen||'')}</span></div><div class="user-actions"><button class="ghost" data-detail="${h(u.user_id)}">👁 История</button><button class="primary" data-send="${h(u.user_id)}">✉️ Написать</button></div><div id="detail-${h(u.user_id)}"></div></div>`).join('')||'<div class="empty">Нет пользователей</div>';document.querySelectorAll('[data-detail]').forEach(x=>x.onclick=()=>adminDetail(+x.dataset.detail));document.querySelectorAll('[data-send]').forEach(x=>x.onclick=()=>adminSend(+x.dataset.send))}catch(e){$("adminUsers").innerHTML=`<div class="empty">${h(e.message)}</div>`}}
-async function adminDetail(id){const b=$(`detail-${id}`);b.innerHTML='<div class="detail">Загрузка…</div>';try{const d=await api('/api/admin',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',action:'user',user_id:id})});b.innerHTML=`<div class="detail"><b>Последние действия</b>${d.views.map(v=>`<div class="view-row">${h(v.viewed_at)} · ${h(v.kind)} · ${h(v.title)}</div>`).join('')||'<div class="small">Нет действий</div>'}</div>`}catch(e){b.innerHTML=`<div class="detail">${h(e.message)}</div>`}}
-async function adminSend(id){const text=prompt(`Сообщение пользователю ${id}:`);if(!text)return;try{await api('/api/admin',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',action:'send',user_id:id,text})});alert('Сообщение отправлено')}catch(e){alert(e.message)}}
-function adminHome(){screen('admin');clearInterval(adminTimer);content.innerHTML=header('🛠 Админ-панель',false)+`<div class="stats"><div class="stat"><b id="adminTotalUsers">—</b><span class="small">Пользователей</span></div><div class="stat"><b id="adminTotalViews">—</b><span class="small">Действий</span></div></div><div class="admin-head"><input id="adminSearch" class="search" placeholder="Поиск по ID, имени, username"><button class="primary" id="adminRefresh">↻</button></div><div id="adminUsers" class="users"><div class="spinner">Загрузка…</div></div>`;$('adminRefresh').onclick=loadAdmin;$('adminSearch').oninput=loadAdmin;loadAdmin();adminTimer=setInterval(loadAdmin,10000)}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{const t=b.dataset.tab;if(t==='learn')learningHome();else if(t==='course')courseHome();else if(t==='frameworks')frameworksHome();else if(t==='libraries')librariesHome();else if(t==='practice')practiceHome('tasks');else if(t==='progress')progressHome();else if(t==='admin'&&state.isAdmin)adminHome()});
+// ---------- ПРОГРЕСС ----------
+async function progressHome(){
+  screen("progress");content.innerHTML='<div class="spinner">Считаем прогресс…</div>';
+  try{
+    const d=await api("/api/progress",{method:"POST",body:JSON.stringify({initData:tg?.initData||"activity"})});
+    const p=d.total?Math.round(d.done/d.total*100):0;
+    content.innerHTML=header("📊 Мой прогресс",false)+`<section class="hero"><h3>Прогресс курса</h3><b>Пройдено ${d.done} из ${d.total}</b><div class="bar"><div class="fill" style="width:${p}%"></div></div><b>${p}%</b></section>
+    <div class="stats"><div class="stat"><b>${d.quiz_correct||0}</b><span>правильных ответов</span></div><div class="stat"><b>${d.quiz_total||0}</b><span>ответов викторины</span></div><div class="stat"><b>${d.total?d.total-d.done:0}</b><span>тем осталось</span></div></div>
+    <section class="hero" style="margin-top:10px"><h3>🎯 Следующий шаг</h3><p>Открой «Обучение», выбери текущий этап и закрепи его через «Практику».</p></section>`;
+  }catch(e){content.innerHTML=`<div class="empty">${h(e.message)}<br><button class="primary" onclick="learningHome()">Продолжить обучение</button></div>`}
+}
+
+// ---------- ПОДДЕРЖКА ----------
+async function supportHome(){
+  screen("support");
+  content.innerHTML=header("🆘 Поддержка",false)+`<section class="support-card" style="padding:16px"><h3>Написать администраторам</h3><p class="small">Сообщение остаётся внутри Mini App и отправляется всем администраторам.</p><textarea id="supportText" class="textarea" maxlength="4000" placeholder="Опиши проблему или вопрос…"></textarea><button class="primary" id="sendSupport" style="margin-top:10px;width:100%">📨 Отправить обращение</button><div id="supportResult"></div></section><section class="hero"><h3>📬 Мои обращения</h3><div id="myTickets"><div class="spinner">Загрузка…</div></div></section>`;
+  $("sendSupport").onclick=sendSupport;
+  await loadMyTickets();
+}
+async function sendSupport(){
+  const text=$("supportText").value.trim();
+  if(!text){toast("Сначала напиши сообщение");return}
+  try{
+    const d=await api("/api/support",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"create",text})});
+    $("supportText").value="";toast(`Обращение #${d.ticket_id} отправлено`);await loadMyTickets();
+  }catch(e){$("supportResult").innerHTML=`<div class="feedback">❌ ${h(e.message)}</div>`}
+}
+async function loadMyTickets(){
+  try{
+    const d=await api("/api/support",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"list"})});
+    $("myTickets").innerHTML=d.tickets.map(t=>`<div class="ticket ${t.status==='answered'?'answered':'open'}"><b>#${t.id} · ${h(t.status)}</b><div class="small">${h(t.created_at)}</div><p>${h(t.text)}</p>${t.reply_text?`<div class="feedback"><b>Ответ администратора:</b><br>${h(t.reply_text)}<div class="small">${h(t.replied_at)}</div></div>`:"<div class='small'>Ответа пока нет.</div>"}</div>`).join("")||'<div class="empty">Обращений пока нет.</div>';
+  }catch(e){$("myTickets").innerHTML=`<div class="empty">${h(e.message)}</div>`}
+}
+
+// ---------- МОДАЛКА ----------
+function openModal(title,hint,action){
+  $("modalTitle").textContent=title;$("modalHint").textContent=hint||"";$("modalText").value="";modalAction=action;$("modalBackdrop").classList.add("show");$("modalText").focus();
+}
+function closeModal(){$("modalBackdrop").classList.remove("show");modalAction=null}
+$("modalClose").onclick=closeModal;$("modalCancel").onclick=closeModal;
+$("modalBackdrop").onclick=e=>{if(e.target===$("modalBackdrop"))closeModal()};
+$("modalSend").onclick=async()=>{
+  const text=$("modalText").value.trim();if(!text){toast("Сообщение пустое");return}
+  const fn=modalAction; if(!fn)return; $("modalSend").disabled=true;
+  try{await fn(text);closeModal()}catch(e){toast(e.message)}finally{$("modalSend").disabled=false}
+};
+
+// ---------- АДМИНКА ----------
+async function loadAdminUsers(){
+  const q=$("adminSearch")?.value||"";
+  const action=adminFilter==="active"?"active":"users";
+  try{
+    const d=await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action,query:q})});
+    $("adminTotalUsers").textContent=d.total_users;
+    $("adminTotalViews").textContent=d.total_views;
+    $("adminActive").textContent=adminFilter==="active"?d.active_count:(d.users||[]).filter(u=>{
+      const s=u.current_tab_at||u.last_seen; if(!s)return false; return Date.now()-new Date(s).getTime()<15*60*1000
+    }).length;
+    $("adminUsers").innerHTML=(d.users||[]).map(u=>`<div class="user-card">
+      <div><b>${u.username?`@${h(u.username)}`:"None"}</b><div class="user-id">ID ${h(u.user_id)}</div><div class="small">Имя: ${h(u.first_name||"None")}</div></div>
+      <div class="user-tab"><b>📍 Сейчас:</b> ${h(u.current_tab||"—")}<br><span class="small">${h(u.current_tab_at||u.last_seen||"—")} · ${h(u.views_count)} действий</span></div>
+      <div class="user-actions"><button class="ghost" data-detail="${h(u.user_id)}">👁 История</button><button class="primary" data-send="${h(u.user_id)}">✉️ Написать</button></div><div id="detail-${h(u.user_id)}"></div>
+    </div>`).join("")||'<div class="empty">Пользователей нет.</div>';
+    document.querySelectorAll("[data-detail]").forEach(x=>x.onclick=()=>adminDetail(+x.dataset.detail));
+    document.querySelectorAll("[data-send]").forEach(x=>x.onclick=()=>adminSend(+x.dataset.send));
+  }catch(e){$("adminUsers").innerHTML=`<div class="empty">${h(e.message)}</div>`}
+}
+async function adminDetail(id){
+  const el=$(`detail-${id}`);el.innerHTML='<div class="detail spinner">Загрузка истории…</div>';
+  try{
+    const d=await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"user",user_id:id})});
+    el.innerHTML=`<div class="detail"><b>Последние действия</b>${d.views.map(v=>`<div class="view-row">${h(v.viewed_at)} · ${h(v.kind)} · ${h(v.title)}</div>`).join("")||'<div class="small">Нет действий</div>'}</div>`;
+  }catch(e){el.innerHTML=`<div class="detail">${h(e.message)}</div>`}
+}
+function adminSend(id){
+  openModal(`✉️ Сообщение пользователю ${id}`,"Сообщение придёт в Telegram-чат с ботом",async text=>{
+    await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"send",user_id:id,text})});toast("Сообщение отправлено");
+  });
+}
+function adminBroadcast(mode,label){
+  openModal(label,"Текст отправится выбранной группе пользователей",async text=>{
+    const d=await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:mode,text})});
+    $("broadcastResult").textContent=`Отправлено: ${d.sent}, ошибок: ${d.failed}`;toast(`Готово: ${d.sent} отправлено`);
+  });
+}
+async function adminSupport(){
+  const host=$("adminSupport");host.innerHTML='<div class="spinner">Загрузка обращений…</div>';
+  try{
+    const d=await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"support"})});
+    host.innerHTML=d.tickets.map(t=>`<div class="ticket ${t.status==='answered'?'answered':'open'}">
+      <b>#${t.id} · ${t.username?`@${h(t.username)}`:"None"}</b><div class="user-id">ID ${h(t.user_id)}</div>
+      <div class="small">${h(t.created_at)} · ${h(t.status)}</div><p>${h(t.text)}</p>
+      ${t.reply_text?`<div class="feedback"><b>Ответ:</b> ${h(t.reply_text)}<div class="small">${h(t.replied_at||"")}</div></div>`:""}
+      ${t.status!=="answered"?`<button class="primary" data-reply="${h(t.id)}">Ответить внутри Mini App</button>`:""}
+    </div>`).join("")||'<div class="empty">Обращений нет.</div>';
+    document.querySelectorAll("[data-reply]").forEach(x=>x.onclick=()=>replyTicket(+x.dataset.reply));
+  }catch(e){host.innerHTML=`<div class="empty">${h(e.message)}</div>`}
+}
+function replyTicket(id){
+  openModal(`🆘 Ответ на обращение #${id}`,"Ответ сохранится в истории обращения и будет отправлен пользователю",async text=>{
+    await api("/api/admin",{method:"POST",body:JSON.stringify({initData:tg?.initData||"",action:"support_reply",ticket_id:id,text})});
+    await adminSupport();toast("Ответ сохранён и отправлен");
+  });
+}
+function adminHome(){
+  screen("admin");
+  content.innerHTML=header("🛠 Админ-панель",false)+`
+    <section class="hero"><h3>📨 Рассылки</h3><div class="grid">
+      <button class="primary" id="bAll">👥 Всем</button>
+      <button class="primary" id="bActive">🟢 Активным</button>
+      <button class="ghost" id="bAdmins">🛠 Админам</button>
+    </div><div id="broadcastResult" class="small" style="margin-top:8px"></div></section>
+    <div class="stats"><div class="stat"><b id="adminTotalUsers">—</b><span>всего</span></div><div class="stat"><b id="adminActive">—</b><span>активны &lt;15 мин</span></div><div class="stat"><b id="adminTotalViews">—</b><span>действий</span></div></div>
+    <div class="filters" style="margin:10px 0"><button class="filter ${adminFilter==="all"?"active":""}" id="fAll">Все пользователи</button><button class="filter ${adminFilter==="active"?"active":""}" id="fActive">Только активные</button></div>
+    <div class="admin-head"><input id="adminSearch" class="search" placeholder="ID, username или имя"><button class="primary" id="adminRefresh">↻</button></div>
+    <div id="adminUsers"><div class="spinner">Загрузка…</div></div>
+    <section class="hero" style="margin-top:12px"><h3>🆘 Поддержка</h3><div id="adminSupport"><div class="spinner">Загрузка…</div></div></section>`;
+  $("bAll").onclick=()=>adminBroadcast("broadcast_all","👥 Сообщение всем пользователям");
+  $("bActive").onclick=()=>adminBroadcast("broadcast_active","🟢 Сообщение активным");
+  $("bAdmins").onclick=()=>adminBroadcast("broadcast_admins","🛠 Сообщение администраторам");
+  $("fAll").onclick=()=>{adminFilter="all";adminHome()};
+  $("fActive").onclick=()=>{adminFilter="active";adminHome()};
+  $("adminRefresh").onclick=()=>{loadAdminUsers();adminSupport()};
+  $("adminSearch").oninput=()=>loadAdminUsers();
+  loadAdminUsers();adminSupport();
+}
+
+// ---------- НАВИГАЦИЯ ----------
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  const t=b.dataset.tab;
+  if(t==="learn")learningHome();
+  else if(t==="course")courseHome();
+  else if(t==="frameworks")catalogHome("framework");
+  else if(t==="libraries")catalogHome("library");
+  else if(t==="practice")practiceHome("tasks");
+  else if(t==="progress")progressHome();
+  else if(t==="support")supportHome();
+  else if(t==="admin"&&state.isAdmin)adminHome();
+});
+
 async function loadApp(){
-  // Telegram's native loading placeholder is hidden immediately.
-  tg?.ready();
-  tg?.expand();
-
+  tg?.ready();tg?.expand();
   const u=tg?.initDataUnsafe?.user;
-  if(u) $("userName").textContent=u.username?`@${u.username}`:(u.first_name||"Telegram");
+  if(u)$("userName").textContent=u.username?`@${u.username}`:(u.first_name||"Telegram");
 
-  // Load the public course payload first so the UI never blocks on auth.
+  // Главное: UI открывается сразу после получения публичного payload.
   try{
     const d=await api("/api/course");
-    state.course=d.course||{};
-    state.frameworks=d.frameworks||{};
-    state.libraries=d.libraries||{};
-    state.miniCodes=d.mini_codes||{};
-    state.learning=d.learning_plan||[];
-    state.tasks=d.practice_tasks||[];
-    state.quizzes=d.quizzes||[];
-    state.total=d.total_topics||0;
+    state.course=d.course||{};state.frameworks=d.frameworks||{};state.libraries=d.libraries||{};
+    state.frameworkGroups=d.framework_groups||[];state.libraryGroups=d.library_groups||[];
+    state.miniCodes=d.mini_codes||{};state.learning=d.learning_plan||[];state.tasks=d.practice_tasks||[];
+    state.quizzes=d.quizzes||[];state.total=d.total_topics||0;
+    if(d.app_version)$("buildVersion").textContent="v"+d.app_version.replace(/^v/i,"");
     learningHome();
   }catch(e){
-    content.innerHTML=`<div class="empty">Не удалось загрузить данные курса.<br>${h(e.message)}<br><br><button class="primary" id="retry">Повторить</button></div>`;
-    $("retry").onclick=loadApp;
+    content.innerHTML=`<div class="empty"><h3>Не удалось загрузить данные</h3><p>${h(e.message)}</p><button class="primary" onclick="loadApp()">Повторить</button></div>`;
     return;
   }
 
-  // Authenticate in the background. UI does not depend on this request.
+  // Авторизация в фоне. От неё не зависит отображение курса.
   if(tg?.initData){
     try{
       const me=await api("/api/me",{method:"POST",body:JSON.stringify({initData:tg.initData})});
       state.isAdmin=!!me.is_admin;
-      if(state.isAdmin) $("adminTab").style.display="block";
-      screen("course");
-    }catch(e){
-      // Keep the Mini App usable. Only user-specific features need auth.
-      console.warn("Telegram authorization failed:",e.message);
-    }
+      if(state.isAdmin)$("adminTab").style.display="block";
+    }catch(e){console.warn("Telegram auth failed:",e.message)}
   }
 }
 loadApp();
 </script>
+</body>
+</html>
