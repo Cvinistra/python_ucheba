@@ -117,6 +117,21 @@ dp = Dispatcher()
 # после запуска бота, затем задать переменную окружения ADMIN_ID.
 ADMIN_ID = int(os.getenv("ADMIN_ID", "") or "0")
 
+def _parse_admin_ids() -> set[int]:
+    ids = set()
+    if ADMIN_ID:
+        ids.add(ADMIN_ID)
+    for raw in os.getenv("ADMIN_IDS", "").split(","):
+        raw = raw.strip()
+        if raw.isdigit():
+            ids.add(int(raw))
+    return ids
+
+ADMIN_IDS = _parse_admin_ids()
+
+def is_admin_user(user_id: int) -> bool:
+    return int(user_id) in ADMIN_IDS
+
 
 # =========================================================
 # MINI APP (Telegram Web App)
@@ -202,6 +217,19 @@ def init_db():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quiz_user ON quiz_attempts(user_id)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS support_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                text TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open'
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_status ON support_messages(status, created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_user ON support_messages(user_id)")
 
         # --- Миграция для баз, созданных до появления колонок вкладки ---
         # (ALTER TABLE ADD COLUMN в SQLite не поддерживает IF NOT EXISTS,
@@ -1233,15 +1261,396 @@ MINI_CODES = {
 }
 
 
+
+# =========================================================
+# КАТЕГОРИИ ФРЕЙМВОРКОВ / БИБЛИОТЕК
+# =========================================================
+
+FRAMEWORK_CATEGORIES = {
+    "web": {"title": "🌐 Веб-разработка", "description": "Серверы, сайты, REST API и веб-приложения."},
+    "telegram": {"title": "🤖 Telegram", "description": "Фреймворки и SDK для Telegram-ботов и клиентов."},
+    "gui": {"title": "🖥 GUI / приложения", "description": "Десктопные и кроссплатформенные приложения."},
+    "data": {"title": "📊 Data / Apps", "description": "Интерактивные приложения и интерфейсы для данных."},
+}
+
+FRAMEWORK_ITEM_CATEGORIES = {
+    "django":"web", "flask":"web", "fastapi":"web", "pyramid":"web", "tornado":"web",
+    "aiohttp":"web", "sanic":"web", "bottle":"web", "cherrypy":"web", "falcon":"web",
+    "starlette":"web", "quart":"web", "litestar":"web", "reflex":"web",
+    "aiogram":"telegram", "telebot":"telegram", "ptb":"telegram", "pyrogram":"telegram", "telethon":"telegram",
+    "kivy":"gui", "streamlit":"data", "dash":"data",
+}
+
+# Дополняем существующую витрину новыми, устойчиво используемыми инструментами.
+FRAMEWORKS.update({
+    "starlette": {
+        "name": "⭐ Starlette", "logo": topic_logo("starlette"), "url": "https://www.starlette.io/",
+        "category": "web",
+        "desc": "Лёгкий ASGI-инструментарий для асинхронных веб-приложений и API. Полезен для понимания middleware, маршрутов и ASGI.",
+        "commands": [
+            ("Route('/', endpoint=home)", "создать маршрут"),
+            ("Middleware(...)", "подключить промежуточную обработку"),
+            ("uvicorn main:app", "запустить ASGI-приложение"),
+        ],
+    },
+    "quart": {
+        "name": "🟣 Quart", "logo": badge("Quart", "5B3A8C", "quart"), "url": "https://quart.palletsprojects.com/",
+        "category": "web",
+        "desc": "Асинхронный веб-фреймворк с интерфейсом, похожим на Flask, для async/await-приложений.",
+        "commands": [
+            ("@app.get('/')", "создать GET-маршрут"),
+            ("await request.get_json()", "прочитать JSON-запрос"),
+            ("await app.run_task()", "запустить приложение в async-контексте"),
+        ],
+    },
+    "litestar": {
+        "name": "🪶 Litestar", "logo": badge("Litestar", "27AE60", "python"), "url": "https://litestar.dev/",
+        "category": "web",
+        "desc": "Современный ASGI-фреймворк для API и веб-приложений с типизацией и зависимостями.",
+        "commands": [
+            ("@get('/')", "описать GET-обработчик"),
+            ("class Controller", "объединить связанные маршруты"),
+            ("Litestar(route_handlers=[...])", "создать приложение"),
+        ],
+    },
+    "reflex": {
+        "name": "⚛️ Reflex", "logo": badge("Reflex", "3A3A3A", "react"), "url": "https://reflex.dev/",
+        "category": "web",
+        "desc": "Подход к созданию веб-интерфейсов на Python с состоянием приложения и компонентами.",
+        "commands": [
+            ("rx.app", "создать приложение"),
+            ("rx.state.State", "описать состояние интерфейса"),
+            ("rx.button(...) ", "добавить кнопку в UI"),
+        ],
+    },
+    "kivy": {
+        "name": "📱 Kivy", "logo": badge("Kivy", "4A90E2", "kivy"), "url": "https://kivy.org/",
+        "category": "gui",
+        "desc": "Кроссплатформенный Python-фреймворк для графических интерфейсов и приложений.",
+        "commands": [
+            ("class MyApp(App)", "создать приложение"),
+            ("Label(text='Привет')", "создать текстовый элемент"),
+            ("MyApp().run()", "запустить приложение"),
+        ],
+    },
+    "streamlit": {
+        "name": "📊 Streamlit", "logo": badge("Streamlit", "FF4B4B", "streamlit"), "url": "https://streamlit.io/",
+        "category": "data",
+        "desc": "Инструмент для быстрых интерактивных приложений и прототипов на Python, особенно удобных для данных.",
+        "commands": [
+            ("st.title('...')", "показать заголовок"),
+            ("st.write(data)", "вывести данные или объект"),
+            ("st.button('Запуск')", "создать кнопку"),
+        ],
+    },
+    "dash": {
+        "name": "📈 Dash", "logo": badge("Dash", "119DFF", "plotly"), "url": "https://dash.plotly.com/",
+        "category": "data",
+        "desc": "Фреймворк для интерактивных аналитических веб-приложений и дашбордов.",
+        "commands": [
+            ("dcc.Graph(figure=...)", "встроить график"),
+            ("html.Div([...])", "создать блок интерфейса"),
+            ("@callback(...) ", "связать ввод и обновление интерфейса"),
+        ],
+    },
+})
+for _key, _data in FRAMEWORKS.items():
+    _data.setdefault("category", FRAMEWORK_ITEM_CATEGORIES.get(_key, "web"))
+
+LIBRARY_CATEGORIES = {
+    "web": {"title": "🌐 Интернет и парсинг", "description": "HTTP, HTML, API и автоматизация браузера."},
+    "data": {"title": "📊 Данные и ML", "description": "Числа, таблицы, графики и машинное обучение."},
+    "db": {"title": "🗄 Базы данных", "description": "ORM и работа с базами данных."},
+    "testing": {"title": "🧪 Тестирование", "description": "Проверка программ и браузерная автоматизация."},
+    "files": {"title": "📁 Файлы и изображения", "description": "Документы, изображения и удобный вывод."},
+    "dev": {"title": "🛠 Инструменты разработчика", "description": "Валидация, переменные окружения, CLI и полезные инструменты."},
+}
+
+LIBRARY_ITEM_CATEGORIES = {
+    "numpy":"data", "pandas":"data", "matplotlib":"data", "tensorflow":"data", "pytorch":"data",
+    "requests":"web", "bs4":"web", "selenium":"testing", "sqlalchemy":"db", "pytest":"testing",
+    "openpyxl":"files", "pillow":"files", "scipy":"data", "sklearn":"data", "pydantic":"dev",
+    "python_dotenv":"dev", "rich":"dev", "typer":"dev", "lxml":"web",
+}
+
+LIBRARIES.update({
+    "openpyxl": {
+        "name":"📗 openpyxl", "logo":badge("openpyxl","2F6B3A","python"), "url":"https://openpyxl.readthedocs.io/",
+        "category":"files", "desc":"Работа с книгами Excel .xlsx: чтение, создание таблиц, ячеек и листов.",
+        "commands":[
+            ("load_workbook('data.xlsx')", "открыть существующий Excel-файл"),
+            ("Workbook()", "создать новую книгу"),
+            ("ws['A1'] = 42", "записать значение в ячейку"),
+        ],
+    },
+    "pillow": {
+        "name":"🖼 Pillow", "logo":badge("Pillow","5A67D8","python"), "url":"https://pillow.readthedocs.io/",
+        "category":"files", "desc":"Библиотека для открытия, изменения и сохранения изображений.",
+        "commands":[
+            ("Image.open('photo.png')", "открыть изображение"),
+            ("img.resize((800, 600))", "изменить размер"),
+            ("img.save('out.png')", "сохранить результат"),
+        ],
+    },
+    "scipy": {
+        "name":"🔬 SciPy", "logo":badge("SciPy","8CAAE6","scipy"), "url":"https://scipy.org/",
+        "category":"data", "desc":"Набор научных алгоритмов поверх NumPy: оптимизация, статистика, обработка сигналов и многое другое.",
+        "commands":[
+            ("from scipy import stats", "подключить статистические инструменты"),
+            ("stats.norm.pdf(x)", "вычислить плотность нормального распределения"),
+            ("scipy.optimize...", "решать задачи оптимизации"),
+        ],
+    },
+    "sklearn": {
+        "name":"🤖 scikit-learn", "logo":badge("scikit-learn","F7931E","scikit-learn"), "url":"https://scikit-learn.org/",
+        "category":"data", "desc":"Инструменты классического машинного обучения: модели, подготовка данных, метрики и пайплайны.",
+        "commands":[
+            ("train_test_split(X, y)", "разделить данные на обучение и проверку"),
+            ("model.fit(X, y)", "обучить модель"),
+            ("model.predict(X)", "получить прогноз"),
+        ],
+    },
+    "pydantic": {
+        "name":"✅ Pydantic", "logo":badge("Pydantic","E92063","pydantic"), "url":"https://docs.pydantic.dev/",
+        "category":"dev", "desc":"Типизированная валидация и преобразование структурированных данных.",
+        "commands":[
+            ("class User(BaseModel)", "описать модель данных"),
+            ("User.model_validate(data)", "проверить входные данные"),
+            ("user.model_dump()", "получить обычный dict"),
+        ],
+    },
+    "python_dotenv": {
+        "name":"🔐 python-dotenv", "logo":badge("dotenv","4B5563","python"), "url":"https://pypi.org/project/python-dotenv/",
+        "category":"dev", "desc":"Удобное чтение переменных окружения из локального .env-файла во время разработки.",
+        "commands":[
+            ("load_dotenv()", "загрузить переменные из .env"),
+            ("os.getenv('BOT_TOKEN')", "получить переменную из окружения"),
+        ],
+    },
+    "rich": {
+        "name":"✨ Rich", "logo":badge("Rich","000000","python"), "url":"https://rich.readthedocs.io/",
+        "category":"dev", "desc":"Красивый вывод в терминале: таблицы, прогресс-бары, подсветка и панели.",
+        "commands":[
+            ("console.print('[bold]Привет[/bold]')", "вывести форматированный текст"),
+            ("Table()", "создать таблицу в терминале"),
+            ("Progress()", "показать прогресс"),
+        ],
+    },
+    "typer": {
+        "name":"⌨️ Typer", "logo":badge("Typer","009688","python"), "url":"https://typer.tiangolo.com/",
+        "category":"dev", "desc":"Создание командных утилит CLI с помощью обычных Python-функций и аннотаций.",
+        "commands":[
+            ("app = typer.Typer()", "создать CLI-приложение"),
+            ("@app.command()", "добавить команду"),
+            ("typer.run(main)", "запустить простую CLI-команду"),
+        ],
+    },
+    "lxml": {
+        "name":"🧱 lxml", "logo":badge("lxml","0B6E4F","python"), "url":"https://lxml.de/",
+        "category":"web", "desc":"Быстрая работа с XML и HTML-деревьями.",
+        "commands":[
+            ("etree.fromstring(xml)", "разобрать XML"),
+            ("xpath('//div')", "найти элементы через XPath"),
+        ],
+    },
+})
+for _key, _data in LIBRARIES.items():
+    _data.setdefault("category", LIBRARY_ITEM_CATEGORIES.get(_key, "dev"))
+
+
+def grouped_catalog(data: dict, category_map: dict) -> list[dict]:
+    result = []
+    for key, meta in category_map.items():
+        items = []
+        for item_key, item in data.items():
+            if item.get("category") == key:
+                items.append({"key": item_key, "name": item.get("name", item_key)})
+        if items:
+            result.append({"id": key, **meta, "items": items})
+    return result
+
+
 # =========================================================
 # ПУТЬ ОБУЧЕНИЯ / ПРАКТИКА / ВИКТОРИНА
 # =========================================================
 
-LEARNING_PLAN = [{'id': 'start', 'title': '🌱 Старт: Python с нуля', 'level': 'Начальный', 'description': 'Первые шаги: как устроен Python, как запускать код и читать простые программы.', 'modules': [{'title': '1. Знакомство с Python', 'topics': ['Что такое Python', 'print()', 'Комментарии']}, {'title': '2. Данные и переменные', 'topics': ['Переменные', 'int / float', 'str / bool', 'type()', 'None']}, {'title': '3. Ввод и простые вычисления', 'topics': ['input()', 'Арифметические', 'Присваивания']}], 'tips': ['Пиши код руками, а не только копируй его.', 'После каждого примера попробуй изменить одно значение и предсказать результат.', 'Ошибки — нормальная часть обучения: сначала прочитай текст ошибки.']}, {'id': 'logic', 'title': '🧠 Логика программ', 'level': 'Начальный', 'description': 'Учимся принимать решения, сравнивать данные и повторять действия.', 'modules': [{'title': '4. Условия', 'topics': ['if', 'elif', 'else', 'вложенные условия', 'тернарный оператор', 'match / case']}, {'title': '5. Циклы', 'topics': ['for', 'while', 'range()', 'break', 'continue', 'вложенные циклы']}, {'title': '6. Коллекции', 'topics': ['list', 'tuple', 'set', 'dict', 'Индексы', 'Срезы']}], 'tips': ['Всегда сначала формулируй условие словами.', 'Разделяй большую задачу на маленькие шаги.', 'Следи за отступами — в Python они часть синтаксиса.']}, {'id': 'functions', 'title': '🧩 Функции и чистый код', 'level': 'Начальный → Средний', 'description': 'Переходим от отдельных строк к переиспользуемым блокам программы.', 'modules': [{'title': '7. Функции', 'topics': ['def', 'return', 'параметры', 'аргументы', 'значения по умолчанию', '*args', '**kwargs']}, {'title': '8. Область видимости', 'topics': ['область видимости', 'global', 'nonlocal', 'lambda', 'рекурсия']}, {'title': '9. Comprehension', 'topics': ['list comprehension', 'dict comprehension', 'set comprehension', 'условия', 'вложенные comprehension']}], 'tips': ['Одна функция — одна понятная задача.', 'Давай переменным и функциям понятные имена.', 'Не усложняй код раньше времени.']}, {'id': 'errors', 'title': '🛡 Ошибки, файлы и данные', 'level': 'Средний', 'description': 'Учимся делать программы устойчивыми и сохранять данные.', 'modules': [{'title': '10. Исключения', 'topics': ['SyntaxError', 'TypeError', 'ValueError', 'IndexError', 'KeyError', 'try', 'except', 'finally', 'raise']}, {'title': '11. Файлы', 'topics': ['open()', 'read()', 'write()', 'with', 'JSON', 'CSV']}, {'title': '12. Модули', 'topics': ['import', 'from ... import', 'as', 'os', 'sys', 'pathlib', 'создание своих модулей']}], 'tips': ['Обрабатывай только те ошибки, которые действительно можешь обработать.', 'Для файлов предпочитай with.', 'Разбивай большой проект на модули.']}, {'id': 'oop', 'title': '🏗 ООП', 'level': 'Средний', 'description': 'Классы, объекты, наследование и организация больших программ.', 'modules': [{'title': '13. Классы и объекты', 'topics': ['Что такое класс', 'object', '__init__', 'self', 'атрибуты', 'методы']}, {'title': '14. Связи между классами', 'topics': ['наследование', 'super()', 'полиморфизм', 'инкапсуляция']}, {'title': '15. Продвинутые возможности', 'topics': ['@property', 'classmethod', 'staticmethod', 'dataclass', 'магические методы']}], 'tips': ['Не используй ООП только ради ООП.', 'Сначала пойми данные и поведение объекта, потом проектируй класс.', 'Наследование не всегда нужно — иногда композиция проще.']}, {'id': 'advanced', 'title': '⚡ Продвинутый Python', 'level': 'Продвинутый', 'description': 'Инструменты языка, которые помогают писать компактный и мощный код.', 'modules': [{'title': '16. Итераторы и генераторы', 'topics': ['итераторы', 'iter()', 'next()', 'генераторы', 'yield']}, {'title': '17. Функциональные инструменты', 'topics': ['декораторы', 'замыкания', 'map()', 'filter()', 'zip()', 'enumerate()', 'any()', 'all()', 'functools']}, {'title': '18. Асинхронность', 'topics': ['async', 'await', 'asyncio', 'coroutine', 'Task', 'gather()', 'sleep()', 'Queue']}], 'tips': ['Сначала добивайся понятного решения, потом оптимизируй.', 'Понимай, где код ждёт ввод-вывод — там часто полезен async.', 'Изучай стандартную библиотеку: там уже есть много готовых инструментов.']}, {'id': 'webdb', 'title': '🌐 Веб, API и базы данных', 'level': 'Продвинутый', 'description': 'Переходим к приложениям, серверам, API и хранению данных.', 'modules': [{'title': '19. SQL и SQLite', 'topics': ['SQL', 'sqlite3', 'CREATE', 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WHERE', 'JOIN', 'Python + SQLite']}, {'title': '20. Интернет и API', 'topics': ['HTTP', 'GET', 'POST', 'JSON', 'requests', 'REST API', 'headers', 'работа с API']}, {'title': '21. Веб-разработка', 'topics': ['Flask', 'FastAPI', 'Django', 'маршруты', 'запросы', 'шаблоны', 'JSON API', 'базы данных']}], 'tips': ['Понимай HTTP до того, как глубоко уходить в веб-фреймворки.', 'Разделяй бизнес-логику и работу с базой.', 'Никогда не храни токены и пароли прямо в коде.']}, {'id': 'projects', 'title': '🚀 Проекты и профессия', 'level': 'Продвинутый → Профи', 'description': 'Собираем знания в реальные проекты и учимся работать как разработчик.', 'modules': [{'title': '22. Telegram-боты', 'topics': ['aiogram', 'Bot', 'Dispatcher', 'handlers', 'Message', 'CallbackQuery', 'InlineKeyboard', 'команды', 'FSM', 'состояния']}, {'title': '23. Практические проекты', 'topics': ['Калькулятор', 'Конвертер', 'Игра', 'Telegram-бот', 'Бот с SQLite', 'API', 'Парсер', 'Веб-приложение']}, {'title': '24. Инструменты разработчика', 'topics': ['pip', 'venv', 'requirements.txt', 'PyPI', 'git init', 'git add', 'git commit', 'git push', 'GitHub']}], 'tips': ['Каждый изученный блок закрепляй маленьким проектом.', 'Веди проекты в Git и пиши README.', 'Собери 3–5 законченных работ, которые можно показать другим.']}]
+LEARNING_PLAN = [
+    {
+        "id":"start", "title":"🌱 1. Старт: как мыслит Python", "level":"Начальный",
+        "description":"Поймёшь, как Python выполняет программу, как запускать код, читать синтаксис и не бояться ошибок.",
+        "modules":[
+            {"title":"1. Знакомство с Python","topics":["Что такое Python","print()","Комментарии","Переменные"]},
+            {"title":"2. Типы и значения","topics":["int / float","str / bool","type()","None","bytes"]},
+            {"title":"3. Ввод и преобразования","topics":["input()","int / float","str / bool","type()"]},
+        ],
+        "tips":["Пиши каждый пример руками и меняй значения.","Перед запуском предположи результат — так ты тренируешь модель выполнения.","Читай ошибки снизу вверх: тип исключения и последняя строка обычно самые полезные подсказки."],
+        "checkpoint":"После этапа ты должен уметь написать программу, которая принимает данные, преобразует их, вычисляет результат и выводит ответ."
+    },
+    {
+        "id":"logic", "title":"🧠 2. Логика программ", "level":"Начальный",
+        "description":"Научишься превращать условия из обычной речи в точные ветвления и повторения.",
+        "modules":[
+            {"title":"4. Условия","topics":["if","elif","else","вложенные условия","тернарный оператор","match / case"]},
+            {"title":"5. Циклы","topics":["for","while","range()","break","continue","else у цикла","вложенные циклы"]},
+            {"title":"6. Коллекции","topics":["list","tuple","set","dict","Индексы","Срезы","append()","get()"]},
+        ],
+        "tips":["Сначала сформулируй алгоритм словами, потом переводи его в код.","Для циклов всегда понимай: что меняется на каждой итерации и когда цикл остановится.","Учись выбирать структуру данных под задачу, а не запоминать методы по отдельности."],
+        "checkpoint":"Ты готов идти дальше, когда можешь самостоятельно написать меню программы, перебрать коллекцию и обработать несколько сценариев."
+    },
+    {
+        "id":"strings", "title":"🔤 3. Строки и работа с текстом", "level":"Начальный",
+        "description":"Научишься чистить, искать, разбивать, форматировать и собирать строки.",
+        "modules":[
+            {"title":"7. Базовые операции","topics":["Создание строк","Индексы","Срезы","len()"]},
+            {"title":"8. Методы строк","topics":["upper()","lower()","strip()","replace()","split()","join()","find()","count()"]},
+            {"title":"9. Форматирование","topics":["f-строки","startswith()","endswith()"]},
+        ],
+        "tips":["Для текста постоянно проверяй, где пробелы и регистр.","Разделяй этапы: очистить → проверить → преобразовать → вывести.","Тренируйся на реальных строках: именах, CSV-строках, URL и сообщениях."],
+        "checkpoint":"Сделай мини-парсер строки: очисти ввод, найди ключевые слова, посчитай совпадения и собери красивый результат."
+    },
+    {
+        "id":"functions", "title":"🧩 4. Функции и декомпозиция", "level":"Начальный → Средний",
+        "description":"Перестанешь писать программу одним большим блоком и научишься делить задачу на понятные функции.",
+        "modules":[
+            {"title":"10. Функции","topics":["def","return","параметры","аргументы","значения по умолчанию","keyword arguments"]},
+            {"title":"11. Гибкие функции","topics":["*args","**kwargs","lambda"]},
+            {"title":"12. Область видимости","topics":["область видимости","global","nonlocal","рекурсия"]},
+        ],
+        "tips":["Функция должна иметь ясную ответственность.","Возвращай результат через return, если его нужно использовать дальше.","Если функция стала слишком большой, раздели её на несколько маленьких функций."],
+        "checkpoint":"Возьми любой старый проект и вынеси ввод, вычисления и вывод в разные функции."
+    },
+    {
+        "id":"collections", "title":"🗃 5. Коллекции и структуры данных", "level":"Средний",
+        "description":"Разберёшься, почему list, tuple, set и dict ведут себя по-разному и как выбирать подходящую структуру.",
+        "modules":[
+            {"title":"13. Списки и кортежи","topics":["list","tuple","Индексы","Срезы","append()","extend()","pop()","copy()"]},
+            {"title":"14. Множества и словари","topics":["set","add()","union()","intersection()","dict","keys()","values()","items()","get()","update()"]},
+            {"title":"15. Генерация данных","topics":["list comprehension","dict comprehension","set comprehension","вложенные comprehension"]},
+        ],
+        "tips":["Думай о доступе к данным: по позиции, по ключу или по уникальности элементов.","Не используй comprehension, если обычный цикл делает код понятнее.","Перед изменением вложенных структур проверяй, копия это или ссылка."],
+        "checkpoint":"Сделай телефонную книгу на dict и отчёт по уникальным значениям через set."
+    },
+    {
+        "id":"errors", "title":"🛡 6. Ошибки, отладка, файлы", "level":"Средний",
+        "description":"Научишься превращать ошибки из препятствия в инструмент диагностики и сохранять данные между запусками.",
+        "modules":[
+            {"title":"16. Исключения","topics":["SyntaxError","TypeError","ValueError","IndexError","KeyError","try","except","finally","raise","создание своих исключений"]},
+            {"title":"17. Файлы","topics":["open()","read()","readline()","readlines()","write()","writelines()","with"]},
+            {"title":"18. Форматы","topics":["JSON","CSV"]},
+        ],
+        "tips":["Не скрывай исключения через голый except: обрабатывай ожидаемые случаи.","Для файлов используй with, чтобы ресурс закрывался автоматически.","Логируй контекст ошибки, а не только её текст."],
+        "checkpoint":"Сделай CLI-заметки: добавление, просмотр и сохранение заметок в JSON."
+    },
+    {
+        "id":"modules", "title":"📦 7. Модули, пакеты и окружение", "level":"Средний",
+        "description":"Поймёшь, как превращать один файл в поддерживаемый проект и как управлять зависимостями.",
+        "modules":[
+            {"title":"19. Импорты","topics":["import","from ... import","as","создание своих модулей"]},
+            {"title":"20. Стандартная библиотека","topics":["math","random","datetime","os","sys","pathlib"]},
+            {"title":"21. Окружение проекта","topics":["pip","venv","requirements.txt","PyPI"]},
+        ],
+        "tips":["Создавай виртуальное окружение для каждого проекта.","requirements.txt должен отражать реальные зависимости проекта.","Не путай имя пакета на PyPI с именем модуля, который импортируется."],
+        "checkpoint":"Собери маленький проект из нескольких .py-файлов и создай для него requirements.txt."
+    },
+    {
+        "id":"oop", "title":"🏗 8. ООП и архитектура объектов", "level":"Средний",
+        "description":"Разберёшься, когда нужны классы, как моделировать данные и поведение и как уменьшать связанность.",
+        "modules":[
+            {"title":"22. Основы ООП","topics":["Что такое класс","object","__init__","self","атрибуты","методы"]},
+            {"title":"23. Переиспользование","topics":["наследование","super()","полиморфизм","инкапсуляция"]},
+            {"title":"24. Продвинутые возможности","topics":["@property","classmethod","staticmethod","dataclass","магические методы"]},
+        ],
+        "tips":["Начинай проектирование с данных и сценариев использования, а не с классов.","Предпочитай простые объекты сложной иерархии наследования.","Проверяй инварианты объекта в одном понятном месте."],
+        "checkpoint":"Сделай модель интернет-магазина: Product, Cart, Order и несколько операций над ними."
+    },
+    {
+        "id":"advanced", "title":"⚡ 9. Продвинутый Python", "level":"Продвинутый",
+        "description":"Поймёшь итераторы, генераторы, декораторы, замыкания и функциональные приёмы.",
+        "modules":[
+            {"title":"25. Итераторы и генераторы","topics":["итераторы","iter()","next()","генераторы","yield"]},
+            {"title":"26. Функции высшего порядка","topics":["декораторы","замыкания","map()","filter()","zip()","enumerate()","any()","all()","functools"]},
+            {"title":"27. Производительность","topics":["генераторы","кэширование","функциональные инструменты"]},
+        ],
+        "tips":["Изучай новые конструкции через маленькие эксперименты.","Не оптимизируй без измерения: сначала профилируй узкое место.","Старайся понимать, какой объект создаётся и когда он освобождается."],
+        "checkpoint":"Напиши генератор обработки большого файла построчно без загрузки всего файла в память."
+    },
+    {
+        "id":"async", "title":"🧵 10. Асинхронность", "level":"Продвинутый",
+        "description":"Освоишь async/await и поймёшь, когда асинхронная архитектура ускоряет I/O-задачи.",
+        "modules":[
+            {"title":"28. Основы async","topics":["async","await","coroutine","asyncio","sleep()"]},
+            {"title":"29. Конкурентный запуск","topics":["Task","gather()","Queue"]},
+            {"title":"30. Асинхронный I/O","topics":["async context manager","aiohttp","HTTP API"]},
+        ],
+        "tips":["async не делает CPU-вычисления автоматически быстрее.","Для сетевых запросов и ожидания файлов/БД асинхронность может дать большой выигрыш.","Следи за тем, чтобы внутри async-кода случайно не блокировать event loop."],
+        "checkpoint":"Сделай программу, которая одновременно запрашивает несколько API и собирает ответы."
+    },
+    {
+        "id":"webdb", "title":"🌐 11. Web, HTTP, API и базы данных", "level":"Продвинутый",
+        "description":"Соберёшь связку клиент → HTTP → сервер → бизнес-логика → база данных.",
+        "modules":[
+            {"title":"31. SQL и SQLite","topics":["SQL","sqlite3","CREATE","SELECT","INSERT","UPDATE","DELETE","WHERE","JOIN","Python + SQLite"]},
+            {"title":"32. HTTP и REST","topics":["HTTP","GET","POST","JSON","requests","REST API","headers","работа с API"]},
+            {"title":"33. Веб-фреймворки","topics":["Flask","FastAPI","Django","маршруты","запросы","шаблоны","JSON API","базы данных"]},
+        ],
+        "tips":["Понимай HTTP-метод, статус и тело ответа, прежде чем углубляться во фреймворк.","Данные от пользователя всегда валидируй.","SQL-запросы с пользовательским вводом делай параметризованными."],
+        "checkpoint":"Сделай REST API для заметок с SQLite и отдельными маршрутами GET/POST."
+    },
+    {
+        "id":"telegram", "title":"🤖 12. Telegram-боты и Mini Apps", "level":"Продвинутый",
+        "description":"Научишься строить бота, который хранит состояние и связывается с веб-интерфейсом.",
+        "modules":[
+            {"title":"34. Архитектура бота","topics":["aiogram","Bot","Dispatcher","handlers","Message","CallbackQuery"]},
+            {"title":"35. Интерфейс и состояние","topics":["InlineKeyboard","команды","FSM","состояния"]},
+            {"title":"36. Mini App","topics":["SQLite + бот","API + бот","Telegram Web App","initData","current_tab"]},
+        ],
+        "tips":["Разделяй обработчики Telegram и бизнес-логику.","Храни только необходимое пользовательское состояние.","Mini App должен проверять данные Telegram на сервере."],
+        "checkpoint":"Собери бота с меню, SQLite, Mini App и записью последнего экрана пользователя."
+    },
+    {
+        "id":"quality", "title":"🧪 13. Тестирование и качество", "level":"Продвинутый",
+        "description":"Перейдёшь от 'работает у меня' к коду, который можно уверенно изменять.",
+        "modules":[
+            {"title":"37. Тесты","topics":["unittest","pytest","assert","тестирование функций"]},
+            {"title":"38. Изоляция","topics":["фикстуры","mock"]},
+            {"title":"39. Чистота проекта","topics":["создание своих модулей","dataclass","typing-подход"]},
+        ],
+        "tips":["Сначала тестируй чистую бизнес-логику, потом интеграцию.","Хороший тест проверяет поведение, а не случайную реализацию.","После исправления бага полезно добавить тест, который не даст ему вернуться."],
+        "checkpoint":"Покрой тестами калькулятор минимум на обычные случаи и ошибки."
+    },
+    {
+        "id":"projects", "title":"🚀 14. Большие проекты и путь к профи", "level":"Профи",
+        "description":"Соединяем Python, Git, базы, API и интерфейс в законченные приложения.",
+        "modules":[
+            {"title":"40. Проектирование","topics":["Калькулятор","Конвертер","Игра","Telegram-бот","Бот с SQLite","API","Парсер","Веб-приложение"]},
+            {"title":"41. Git и GitHub","topics":["git init","git add","git commit","git push","git pull","branches","merge","GitHub"]},
+            {"title":"42. Портфолио","topics":["README","структура проекта","requirements.txt","деплой","демо"]},
+        ],
+        "tips":["Заканчивай маленькие проекты до перехода к огромным.","Коммить изменения небольшими логичными шагами.","Каждый проект должен отвечать на вопрос: какую проблему он решает?"],
+        "checkpoint":"Собери один законченный проект и оформи его README, установку, запуск и примеры работы."
+    },
+]
 
 PRACTICE_TASKS = [{'id': 't1', 'title': 'Чётное или нечётное', 'difficulty': '🟢 Легко', 'prompt': 'Попроси пользователя ввести целое число и выведи, чётное оно или нечётное.', 'hint': 'Используй остаток от деления %.', 'solution': 'n = int(input("Число: "))\nif n % 2 == 0:\n    print("Чётное")\nelse:\n    print("Нечётное")'}, {'id': 't2', 'title': 'Максимум из двух', 'difficulty': '🟢 Легко', 'prompt': 'Введи два числа и выведи большее из них.', 'hint': 'Сравни числа через if/else или max().', 'solution': 'a = int(input())\nb = int(input())\nprint(max(a, b))'}, {'id': 't3', 'title': 'Сумма списка', 'difficulty': '🟢 Легко', 'prompt': 'Создай список чисел и посчитай сумму его элементов без ручного сложения.', 'hint': 'Попробуй sum().', 'solution': 'numbers = [3, 7, 2, 9]\nprint(sum(numbers))'}, {'id': 't4', 'title': 'Подсчёт гласных', 'difficulty': '🟡 Средне', 'prompt': 'Посчитай, сколько гласных букв в строке.', 'hint': 'Используй строку vowels = "аеёиоуыэюя" и цикл for.', 'solution': 'text = input().lower()\ncount = sum(ch in "аеёиоуыэюя" for ch in text)\nprint(count)'}, {'id': 't5', 'title': 'Разворот строки', 'difficulty': '🟡 Средне', 'prompt': 'Выведи строку в обратном порядке.', 'hint': 'Вспомни срез [::-1].', 'solution': 'text = input()\nprint(text[::-1])'}, {'id': 't6', 'title': 'Функция приветствия', 'difficulty': '🟡 Средне', 'prompt': 'Напиши функцию greet(name), которая возвращает приветствие с именем.', 'hint': 'Функция должна использовать return.', 'solution': 'def greet(name):\n    return f"Привет, {name}!"'}, {'id': 't7', 'title': 'Словарь пользователя', 'difficulty': '🟡 Средне', 'prompt': 'Создай словарь с name и age, затем безопасно получи значение age через get().', 'hint': 'get() принимает ключ и значение по умолчанию.', 'solution': 'user = {"name": "Alex", "age": 14}\nprint(user.get("age", 0))'}, {'id': 't8', 'title': 'Чтение JSON', 'difficulty': '🟠 Сложнее', 'prompt': 'Сохрани словарь в JSON-файл, а затем прочитай его обратно.', 'hint': 'Нужен модуль json и dump/load.', 'solution': 'import json\ndata = {"name": "Alex"}\nwith open("data.json", "w", encoding="utf-8") as f:\n    json.dump(data, f, ensure_ascii=False)'}, {'id': 't9', 'title': 'SQLite запрос', 'difficulty': '🟠 Сложнее', 'prompt': 'Подключись к SQLite и выполни SELECT из таблицы users.', 'hint': 'Используй sqlite3.connect() и execute().', 'solution': 'import sqlite3\nconn = sqlite3.connect("app.db")\nrows = conn.execute("SELECT * FROM users").fetchall()\nprint(rows)\nconn.close()'}, {'id': 't10', 'title': 'Асинхронная пауза', 'difficulty': '🟠 Сложнее', 'prompt': 'Напиши async-функцию, которая ждёт одну секунду через asyncio.sleep().', 'hint': 'Внутри async def можно использовать await.', 'solution': 'import asyncio\n\nasync def main():\n    await asyncio.sleep(1)\n    print("Готово")\n\nasyncio.run(main())'}, {'id': 't11', 'title': 'API JSON', 'difficulty': '🔴 Продвинуто', 'prompt': 'Сделай GET-запрос через requests и выведи JSON-ответ.', 'hint': 'У ответа есть метод json().', 'solution': 'import requests\nresponse = requests.get("https://api.example.com/data")\nprint(response.json())'}, {'id': 't12', 'title': 'Telegram обработчик', 'difficulty': '🔴 Продвинуто', 'prompt': 'Создай простой handler в aiogram, который отвечает на текст «Привет».', 'hint': 'Используй декоратор @dp.message и F.text.', 'solution': '@dp.message(F.text == "Привет")\nasync def hello(message: Message):\n    await message.answer("Привет!")'}]
 
 QUIZ_QUESTIONS = [{'id': 'q1', 'title': 'Условия', 'code': 'age = 20\n\nif age >= 18\n    print("Взрослый")', 'options': ['Добавить : после условия if', 'Заменить >= на =', 'Удалить отступ перед print()', 'Добавить скобки вокруг age'], 'correct': 0, 'explanation': 'После условия if в Python нужен двоеточие :.'}, {'id': 'q2', 'title': 'Сравнение', 'code': 'x = 10\nif x = 10:\n    print("yes")', 'options': ['x == 10', 'x := 10', 'x >= 10', 'x is 10'], 'correct': 0, 'explanation': 'Для сравнения значений используется ==, а = — присваивание.'}, {'id': 'q3', 'title': 'Список', 'code': 'numbers = [1, 2, 3]\nprint(numbers[3])', 'options': ['print(numbers[2])', 'print(numbers[1])', 'print(numbers[-3])', 'print(numbers[0])'], 'correct': 0, 'explanation': 'Последний элемент списка с тремя значениями имеет индекс 2.'}, {'id': 'q4', 'title': 'Функция', 'code': 'def add(a, b)\n    return a + b', 'options': ['Добавить : после )', 'Добавить ; после )', 'Заменить return на print', 'Удалить отступ перед return'], 'correct': 0, 'explanation': 'После объявления функции тоже нужен двоеточие :.'}, {'id': 'q5', 'title': 'Переменная', 'code': 'name = "Alex"\nprint(nmae)', 'options': ['print(name)', 'print("name")', 'print(Name)', 'print(name())'], 'correct': 0, 'explanation': 'Имя переменной написано с опечаткой: nmae вместо name.'}, {'id': 'q6', 'title': 'Длина числа', 'code': 'age = 14\nprint(len(age))', 'options': ['print(len(str(age)))', 'print(age.len())', 'print(length(age))', 'print(len(int(age)))'], 'correct': 0, 'explanation': 'len() работает с последовательностями; число можно сначала превратить в строку.'}, {'id': 'q7', 'title': 'Словарь', 'code': 'user = {"name": "Alex"}\nprint(user["age"])', 'options': ['print(user.get("age"))', 'print(user.get["age"])', 'print(user.age)', 'print(user("age"))'], 'correct': 0, 'explanation': 'get() безопасно получает значение по ключу, которого может не быть.'}, {'id': 'q8', 'title': 'Импорт', 'code': 'import maths\nprint(math.sqrt(16))', 'options': ['import math', 'import mathematics as math', 'from math import sqrt', 'import math as maths'], 'correct': 0, 'explanation': 'Модуль стандартной библиотеки называется math, а не maths.'}, {'id': 'q9', 'title': 'Цикл', 'code': 'for i in range(3)\n    print(i)', 'options': ['Добавить : после range(3)', 'Заменить for на while', 'Удалить отступ перед print(i)', 'Добавить i = 0 перед for'], 'correct': 0, 'explanation': 'После заголовка цикла for нужен двоеточие :.'}, {'id': 'q10', 'title': 'Строка', 'code': 'text = "Python"\nprint(text.upper)', 'options': ['print(text.upper())', 'print(upper(text))', 'print(text.upper[])', 'print(text->upper())'], 'correct': 0, 'explanation': 'Метод upper нужно вызвать со скобками: upper().'}, {'id': 'q11', 'title': 'Список', 'code': 'items = []\nitems.apend(1)\nprint(items)', 'options': ['items.append(1)', 'items.add(1)', 'items.insert(1)', 'items.push(1)'], 'correct': 0, 'explanation': 'У списка Python метод называется append().'}, {'id': 'q12', 'title': 'Файл', 'code': 'with open("data.txt", "r" encoding="utf-8") as f:\n    print(f.read())', 'options': ['with open("data.txt", "r", encoding="utf-8") as f:', 'with open("data.txt", r, encoding="utf-8") as f:', 'with open("data.txt"; "r"; encoding="utf-8") as f:', 'with open("data.txt", "r"), encoding="utf-8" as f:'], 'correct': 0, 'explanation': 'Аргументы функции open() разделяются запятыми.'}, {'id': 'q13', 'title': 'Comprehension', 'code': 'even = [x for x in range(10) x % 2 == 0]', 'options': ['even = [x for x in range(10) if x % 2 == 0]', 'even = [x if for x in range(10) % 2 == 0]', 'even = [x in range(10) if x % 2 == 0]', 'even = (x for x in range(10) if x % 2 == 0]'], 'correct': 0, 'explanation': 'В list comprehension условие вводится через if.'}, {'id': 'q14', 'title': 'Asyncio', 'code': 'async def main():\n    asyncio.sleep(1)\n    print("done")', 'options': ['await asyncio.sleep(1)', 'asyncio.await sleep(1)', 'await asyncio.sleep', 'async sleep(1)'], 'correct': 0, 'explanation': 'Асинхронную операцию внутри async-функции нужно ожидать через await.'}, {'id': 'q15', 'title': 'SQLite', 'code': 'conn = sqlite3.connect("app.db")\nconn.execute("INSERT INTO users (name) VALUES (?)", "Alex")', 'options': ['conn.execute("INSERT INTO users (name) VALUES (?)", ("Alex",))', 'conn.execute("INSERT INTO users (name) VALUES (?)", [Alex])', 'conn.execute("INSERT INTO users (name) VALUES (?)", Alex)', 'conn.execute("INSERT INTO users (name) VALUES (?)", {"Alex"})'], 'correct': 0, 'explanation': 'Параметры для DB-API передаются как последовательность значений, здесь кортеж из одного элемента.'}]
+
+# Вопросы не должны всегда иметь правильный ответ под номером 1.
+for _i, _q in enumerate(QUIZ_QUESTIONS):
+    _shift = (_i * 3) % 4
+    if _shift:
+        _q["options"] = _q["options"][_shift:] + _q["options"][:_shift]
+        _q["correct"] = (_q["correct"] - _shift) % 4
+
+# Дополнительные задания: от простых до проектных.
+PRACTICE_TASKS.extend([
+    {"id":"t13","title":"Фильтр положительных чисел","difficulty":"🟡 Средне","prompt":"Из списка чисел создай новый список только с положительными значениями.","hint":"Подойдёт обычный цикл или list comprehension.","solution":"numbers = [-3, 4, 0, 8, -1]\npositive = [x for x in numbers if x > 0]\nprint(positive)"},
+    {"id":"t14","title":"Частотность слов","difficulty":"🟡 Средне","prompt":"Посчитай, сколько раз каждое слово встречается в строке.","hint":"Разбей строку через split() и храни счётчик в dict.","solution":"text = input().lower().split()\ncounts = {}\nfor word in text:\n    counts[word] = counts.get(word, 0) + 1\nprint(counts)"},
+    {"id":"t15","title":"Безопасный ввод числа","difficulty":"🟠 Сложнее","prompt":"Напиши функцию, которая просит число и повторяет ввод, пока пользователь не введёт корректное целое.","hint":"Используй while True и try/except ValueError.","solution":"def read_int():\n    while True:\n        try:\n            return int(input(\"Число: \"))\n        except ValueError:\n            print(\"Введите целое число\")"},
+    {"id":"t16","title":"JSON-заметки","difficulty":"🟠 Сложнее","prompt":"Сохрани список заметок в JSON и загрузи его при следующем запуске.","hint":"Используй json.dump/json.load и with.","solution":"import json\n\nnotes = [\"Изучить циклы\", \"Решить задачу\"]\nwith open(\"notes.json\", \"w\", encoding=\"utf-8\") as f:\n    json.dump(notes, f, ensure_ascii=False, indent=2)"},
+    {"id":"t17","title":"SQLite CRUD","difficulty":"🔴 Продвинуто","prompt":"Создай таблицу tasks и реализуй INSERT + SELECT через sqlite3.","hint":"Сначала CREATE TABLE IF NOT EXISTS, затем INSERT и SELECT.","solution":"import sqlite3\n\nconn = sqlite3.connect(\"tasks.db\")\nconn.execute(\"CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)\")\nconn.execute(\"INSERT INTO tasks (title) VALUES (?)\", (\"Изучить SQL\",))\nconn.commit()\nprint(conn.execute(\"SELECT * FROM tasks\").fetchall())\nconn.close()"},
+    {"id":"t18","title":"Мини-API","difficulty":"🔴 Продвинуто","prompt":"Сделай GET endpoint, который возвращает JSON со списком задач.","hint":"В FastAPI достаточно функции с декоратором @app.get и возврата dict/list.","solution":"from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/tasks\")\ndef tasks():\n    return [{\"id\": 1, \"title\": \"Изучить Python\"}]"},
+])
 
 # =========================================================
 # ГЛАВНОЕ МЕНЮ (кнопки по 2 в ряд)
@@ -1264,7 +1673,8 @@ def main_menu():
         InlineKeyboardButton(text="📚 Библиотеки", callback_data="libraries"),
     ])
     rows.append([
-        InlineKeyboardButton(text="📊 Мой прогресс", callback_data="progress")
+        InlineKeyboardButton(text="📊 Мой прогресс", callback_data="progress"),
+        InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")
     ])
 
     # Кнопка мини-приложения показывается только если задан MINIAPP_URL.
@@ -1307,28 +1717,51 @@ def section_menu(section_number):
 # МЕНЮ «ФРЕЙМВОРКИ» И «БИБЛИОТЕКИ» (по 2 в ряд)
 # =========================================================
 
-def frameworks_menu():
-    buttons = [
-        InlineKeyboardButton(text=data["name"], callback_data=f"framework_{key}")
-        for key, data in FRAMEWORKS.items()
-    ]
-    rows = grid(buttons, 2)
-    rows.append([
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="course")
-    ])
+def _catalog_category_buttons(prefix: str, categories: dict, callback_prefix: str) -> list[list[InlineKeyboardButton]]:
+    buttons = [InlineKeyboardButton(text=v["title"], callback_data=f"{callback_prefix}{k}") for k, v in categories.items()
+               if any(x.get("category") == k for x in (FRAMEWORKS if prefix == "framework" else LIBRARIES).values())]
+    return grid(buttons, 1)
+
+
+def frameworks_menu(category: str | None = None):
+    if category:
+        data_items = {k:v for k,v in FRAMEWORKS.items() if v.get("category") == category}
+        buttons = [InlineKeyboardButton(text=data["name"], callback_data=f"framework_{key}") for key, data in data_items.items()]
+        rows = grid(buttons, 2)
+        rows.append([InlineKeyboardButton(text="⬅️ Категории", callback_data="frameworks")])
+    else:
+        rows = _catalog_category_buttons("framework", FRAMEWORK_CATEGORIES, "fwcat_")
+        rows.append([InlineKeyboardButton(text="📚 Все фреймворки", callback_data="fwcat_all")])
+    rows.append([InlineKeyboardButton(text="🏠 Главное меню", callback_data="course")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def libraries_menu():
-    buttons = [
-        InlineKeyboardButton(text=data["name"], callback_data=f"library_{key}")
-        for key, data in LIBRARIES.items()
-    ]
-    rows = grid(buttons, 2)
-    rows.append([
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="course")
-    ])
+def libraries_menu(category: str | None = None):
+    if category:
+        data_items = {k:v for k,v in LIBRARIES.items() if v.get("category") == category}
+        buttons = [InlineKeyboardButton(text=data["name"], callback_data=f"library_{key}") for key, data in data_items.items()]
+        rows = grid(buttons, 2)
+        rows.append([InlineKeyboardButton(text="⬅️ Категории", callback_data="libraries")])
+    else:
+        rows = _catalog_category_buttons("library", LIBRARY_CATEGORIES, "lbcat_")
+        rows.append([InlineKeyboardButton(text="📚 Все библиотеки", callback_data="lbcat_all")])
+    rows.append([InlineKeyboardButton(text="🏠 Главное меню", callback_data="course")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def commands_menu(kind: str, key: str, commands: list):
+    rows = []
+    for i, (cmd, _desc) in enumerate(commands):
+        rows.append([InlineKeyboardButton(text=f"{i+1}. {cmd[:45]}", callback_data=f"{kind}cmd_{key}_{i}")])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=f"{kind}_{key}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def command_detail_kb(kind: str, key: str, index: int):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="⬅️ Все команды", callback_data=f"{kind}cmds_{key}"),
+        InlineKeyboardButton(text="🏠 Главное меню", callback_data="course"),
+    ]])
 
 
 def commands_block(commands: list) -> str:
@@ -1337,26 +1770,23 @@ def commands_block(commands: list) -> str:
         return ""
     lines = ["\n\n🧭 <b>Основные команды:</b>"]
     for cmd, desc in commands:
-        lines.append(f"• <code>{html.escape(cmd)}</code> — {desc}")
+        lines.append(f"• <code>{html.escape(cmd)}</code> — {html.escape(desc)}")
     return "\n".join(lines)
 
 
 def item_caption(data: dict) -> str:
-    """Собирает полный текст карточки: название + описание + команды."""
     return f"<b>{data['name']}</b>\n\n{data['desc']}{commands_block(data.get('commands', []))}"
 
 
-def item_back_kb(back_to: str, url: str | None = None):
-    """Клавиатура карточки фреймворка/библиотеки: ссылка на сайт (если есть) + назад + в меню."""
+def item_back_kb(back_to: str, url: str | None = None, kind: str | None = None, key: str | None = None):
     rows = []
+    data_commands = (FRAMEWORKS.get(key, {}) if kind == "framework" else LIBRARIES.get(key, {})).get("commands", [])
+    if kind and key and data_commands:
+        rows.append([InlineKeyboardButton(text="🧭 Посмотреть команды", callback_data=f"{kind}cmds_{key}")])
     if url:
         rows.append([InlineKeyboardButton(text="🔗 Официальный сайт", url=url)])
-    rows.append([
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=back_to),
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="course"),
-    ])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=back_to), InlineKeyboardButton(text="🏠 Главное меню", callback_data="course")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
 
 # =========================================================
 # /START
@@ -1498,7 +1928,7 @@ async def show_frameworks(callback: CallbackQuery):
             media=PYTHON_LOGO,
             caption=(
                 "🧩 <b>Фреймворки Python</b>\n\n"
-                "Выбери фреймворк, чтобы увидеть его логотип и подробное описание:"
+                "Сначала выбери направление — внутри будут только подходящие фреймворки."
             ),
             parse_mode="HTML",
         ),
@@ -1525,7 +1955,7 @@ async def open_framework(callback: CallbackQuery):
             caption=item_caption(data),
             parse_mode="HTML",
         ),
-        reply_markup=item_back_kb("frameworks", data.get("url")),
+        reply_markup=item_back_kb("frameworks", data.get("url"), "framework", key),
     )
     await callback.answer()
 
@@ -1543,7 +1973,7 @@ async def show_libraries(callback: CallbackQuery):
             media=PYTHON_LOGO,
             caption=(
                 "📚 <b>Библиотеки Python</b>\n\n"
-                "Выбери библиотеку, чтобы увидеть её логотип и подробное описание:"
+                "Выбери направление — внутри будут только подходящие библиотеки."
             ),
             parse_mode="HTML",
         ),
@@ -1570,10 +2000,108 @@ async def open_library(callback: CallbackQuery):
             caption=item_caption(data),
             parse_mode="HTML",
         ),
-        reply_markup=item_back_kb("libraries", data.get("url")),
+        reply_markup=item_back_kb("libraries", data.get("url"), "library", key),
     )
     await callback.answer()
 
+
+
+@dp.callback_query(F.data.startswith("fwcat_"))
+async def framework_category(callback: CallbackQuery):
+    category = callback.data.split("_", 1)[1]
+    if category == "all":
+        category = None
+    await touch_user(callback.from_user)
+    await log_view(callback.from_user.id, "framework_category", category or "all")
+    if category:
+        title = FRAMEWORK_CATEGORIES.get(category, {}).get("title", "Фреймворки")
+        caption = f"🧩 <b>{html.escape(title)}</b>\n\nВыбери технологию."
+    else:
+        caption = "🧩 <b>Все фреймворки</b>\n\nВыбери технологию."
+    await callback.message.edit_caption(caption=caption, reply_markup=frameworks_menu(category), parse_mode="HTML")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("lbcat_"))
+async def library_category(callback: CallbackQuery):
+    category = callback.data.split("_", 1)[1]
+    if category == "all":
+        category = None
+    await touch_user(callback.from_user)
+    await log_view(callback.from_user.id, "library_category", category or "all")
+    if category:
+        title = LIBRARY_CATEGORIES.get(category, {}).get("title", "Библиотеки")
+        caption = f"📚 <b>{html.escape(title)}</b>\n\nВыбери библиотеку."
+    else:
+        caption = "📚 <b>Все библиотеки</b>\n\nВыбери библиотеку."
+    await callback.message.edit_caption(caption=caption, reply_markup=libraries_menu(category), parse_mode="HTML")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("frameworkcmds_"))
+async def framework_commands(callback: CallbackQuery):
+    key = callback.data.split("_", 1)[1]
+    data = FRAMEWORKS.get(key)
+    if not data:
+        await callback.answer("Фреймворк не найден", show_alert=True); return
+    await callback.message.edit_caption(
+        caption=f"🧭 <b>Команды: {html.escape(data['name'])}</b>\n\nНажми на команду, чтобы увидеть подробное объяснение.",
+        reply_markup=commands_menu("framework", key, data.get("commands", [])),
+        parse_mode="HTML")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("frameworkcmd_"))
+async def framework_command_detail(callback: CallbackQuery):
+    payload = callback.data[len("frameworkcmd_"):]
+    try:
+        key, idx_raw = payload.rsplit("_", 1)
+        idx = int(idx_raw)
+    except (ValueError, IndexError):
+        await callback.answer("Команда не найдена", show_alert=True); return
+    data = FRAMEWORKS.get(key)
+    commands = data.get("commands", []) if data else []
+    if not data or idx < 0 or idx >= len(commands):
+        await callback.answer("Команда не найдена", show_alert=True); return
+    cmd, desc = commands[idx]
+    await touch_user(callback.from_user); await log_view(callback.from_user.id, "framework_command", f"{data['name']}: {cmd}")
+    await callback.message.edit_caption(
+        caption=f"🧩 <b>{html.escape(data['name'])}</b>\n\n<code>{html.escape(cmd)}</code>\n\n<b>Что делает:</b> {html.escape(desc)}\n\n💡 <b>Как учить:</b> попробуй поменять аргументы команды и проверить, как изменится поведение.",
+        reply_markup=command_detail_kb("framework", key, idx), parse_mode="HTML")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("librarycmds_"))
+async def library_commands(callback: CallbackQuery):
+    key = callback.data.split("_", 1)[1]
+    data = LIBRARIES.get(key)
+    if not data:
+        await callback.answer("Библиотека не найдена", show_alert=True); return
+    await callback.message.edit_caption(
+        caption=f"🧭 <b>Команды: {html.escape(data['name'])}</b>\n\nНажми на команду, чтобы увидеть подробное объяснение.",
+        reply_markup=commands_menu("library", key, data.get("commands", [])),
+        parse_mode="HTML")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("librarycmd_"))
+async def library_command_detail(callback: CallbackQuery):
+    payload = callback.data[len("librarycmd_"):]
+    try:
+        key, idx_raw = payload.rsplit("_", 1)
+        idx = int(idx_raw)
+    except (ValueError, IndexError):
+        await callback.answer("Команда не найдена", show_alert=True); return
+    data = LIBRARIES.get(key)
+    commands = data.get("commands", []) if data else []
+    if not data or idx < 0 or idx >= len(commands):
+        await callback.answer("Команда не найдена", show_alert=True); return
+    cmd, desc = commands[idx]
+    await touch_user(callback.from_user); await log_view(callback.from_user.id, "library_command", f"{data['name']}: {cmd}")
+    await callback.message.edit_caption(
+        caption=f"📦 <b>{html.escape(data['name'])}</b>\n\n<code>{html.escape(cmd)}</code>\n\n<b>Что делает:</b> {html.escape(desc)}\n\n💡 <b>Совет:</b> попробуй найти в документации ещё один способ решить ту же задачу.",
+        reply_markup=command_detail_kb("library", key, idx), parse_mode="HTML")
+    await callback.answer()
 
 # =========================================================
 # ПРОГРЕСС
@@ -1625,6 +2153,102 @@ async def progress(callback: CallbackQuery):
 
     await callback.answer()
 
+
+
+SUPPORT_WAITING: set[int] = set()
+
+
+def _save_support_sync(user_id: int, username: str, first_name: str, text: str) -> int:
+    now = datetime.now().isoformat(timespec="seconds")
+    with db_connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO support_messages (user_id, username, first_name, text, created_at, status) VALUES (?, ?, ?, ?, ?, 'open')",
+            (user_id, username or "", first_name or "", text, now),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+
+
+async def send_support_to_admins(user, text: str):
+    ticket_id = await asyncio.to_thread(_save_support_sync, user.id, user.username or "", user.first_name or "", text)
+    uname = f"@{user.username}" if user.username else "None"
+    recipients = ADMIN_IDS or ({ADMIN_ID} if ADMIN_ID else set())
+    admin_text = (
+        f"🆘 <b>Новое обращение #{ticket_id}</b>\n\n"
+        f"👤 {html.escape(uname)}\n"
+        f"🆔 <code>{user.id}</code>\n"
+        f"Имя: {html.escape(user.first_name or 'None')}\n\n"
+        f"💬 {html.escape(text)}\n\n"
+        f"Ответить: <code>/reply_support {ticket_id} ваш ответ</code>"
+    )
+    for admin_id in recipients:
+        try:
+            await bot.send_message(admin_id, admin_text, parse_mode="HTML")
+        except Exception:
+            log.exception("Не удалось доставить обращение администратору %s", admin_id)
+    return ticket_id
+
+
+@dp.callback_query(F.data == "support")
+async def support_start(callback: CallbackQuery):
+    await touch_user(callback.from_user)
+    await log_view(callback.from_user.id, "menu", "support")
+    SUPPORT_WAITING.add(callback.from_user.id)
+    await callback.message.answer(
+        "🆘 <b>Поддержка</b>\n\nНапиши одним сообщением, что произошло или какой вопрос у тебя возник.\n\nСообщение получат все администраторы.",
+        parse_mode="HTML",
+    )
+    await callback.answer("Напиши сообщение поддержки")
+
+
+@dp.message(F.text == "/support")
+async def support_command(message: Message):
+    await touch_user(message.from_user)
+    SUPPORT_WAITING.add(message.from_user.id)
+    await message.answer(
+        "🆘 <b>Поддержка</b>\n\nНапиши сообщение следующим сообщением. Его получат все администраторы.",
+        parse_mode="HTML")
+
+
+@dp.message(lambda message: bool(message.from_user and message.from_user.id in SUPPORT_WAITING and message.text and not message.text.startswith("/")))
+async def support_message(message: Message):
+    SUPPORT_WAITING.discard(message.from_user.id)
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("❌ Сообщение пустое. Попробуй ещё раз через /support.")
+        return
+    ticket_id = await send_support_to_admins(message.from_user, text)
+    await message.answer(f"✅ Сообщение отправлено администраторам. Номер обращения: <b>#{ticket_id}</b>", parse_mode="HTML")
+
+
+@dp.message(F.text.startswith("/reply_support"))
+async def support_reply(message: Message):
+    if not is_admin_user(message.from_user.id):
+        await message.answer("⛔ У тебя нет прав администратора.")
+        return
+    parts = (message.text or "").split(maxsplit=2)
+    if len(parts) < 3:
+        await message.answer("Формат: /reply_support НОМЕР текст ответа")
+        return
+    try: ticket_id = int(parts[1])
+    except ValueError:
+        await message.answer("❌ Номер обращения должен быть числом.")
+        return
+    reply_text = parts[2].strip()
+    with db_connect() as conn:
+        row = conn.execute("SELECT user_id FROM support_messages WHERE id=?", (ticket_id,)).fetchone()
+    if not row:
+        await message.answer("❌ Обращение не найдено.")
+        return
+    try:
+        await bot.send_message(int(row[0]), f"🆘 <b>Ответ поддержки</b>\n\n{html.escape(reply_text)}", parse_mode="HTML")
+    except Exception as exc:
+        await message.answer(f"❌ Не удалось отправить ответ: <code>{html.escape(str(exc))}</code>", parse_mode="HTML")
+        return
+    with db_connect() as conn:
+        conn.execute("UPDATE support_messages SET status='answered' WHERE id=?", (ticket_id,))
+        conn.commit()
+    await message.answer(f"✅ Ответ по обращению #{ticket_id} отправлен.")
 
 # =========================================================
 # МОЙ TELEGRAM ID
@@ -1686,12 +2310,12 @@ async def admin_stats(message: Message):
         "<b>🏆 Топ-10 самых активных:</b>\n"
     )
     for user_id, username, first_name, cnt in top_users:
-        uname = f"@{username}" if username else (first_name or str(user_id))
+        uname = f"@{username}" if username else "None"
         text += f"• {uname} — {cnt}\n"
 
     text += "\n<b>🕓 Последние действия:</b>\n"
     for first_name, username, kind, title, viewed_at in last_views:
-        uname = f"@{username}" if username else (first_name or "???")
+        uname = f"@{username}" if username else "None"
         text += f"• {viewed_at} — {uname}: [{kind}] {title}\n"
 
     # Telegram режет сообщения длиннее 4096 символов
@@ -1769,6 +2393,182 @@ async def admin_export(message: Message):
 # =========================================================
 # ТЕКСТ УРОКА
 # =========================================================
+
+
+# =========================================================
+# РАСШИРЕННЫЕ УРОКИ
+# =========================================================
+
+LESSON_GUIDES = {
+    "Что такое Python": {
+        "core": "Python — не просто набор команд. Программа — это последовательность инструкций и данных, которую интерпретатор выполняет по правилам языка.",
+        "why": "Важно сначала понять модель выполнения: Python читает программу, создаёт объекты, вызывает функции и меняет состояние программы. Это помогает потом понимать переменные, функции и исключения.",
+        "example": 'name = "Alex"\nage = 14\nprint(f"{name}: {age}")',
+        "breakdown": "1) создаются две переменные; 2) f-строка собирает текст; 3) print выводит готовую строку.",
+        "mistakes": ["Учить синтаксис без практики.", "Копировать код, не меняя его.", "Игнорировать сообщения об ошибках."],
+        "practice": "Измени пример так, чтобы он спрашивал имя и возраст, а затем выводил фразу о пользователе."
+    },
+    "Переменные": {
+        "core": "Имя переменной связывает понятное обозначение с объектом-значением. Само имя не 'содержит коробку' — оно ссылается на объект.",
+        "why": "Так код получает состояние, которым можно управлять: счётчик, пользователь, список задач, ответ API.",
+        "example": 'score = 0\nscore = score + 10\nprint(score)',
+        "breakdown": "Сначала score ссылается на 0, затем выражение вычисляется и имя score начинает ссылаться на 10.",
+        "mistakes": ["Путать = и ==.", "Использовать непонятные имена вроде x1, x2, x3.", "Переиспользовать имя для значения другого смысла."],
+        "practice": "Создай переменные price, count и total и вычисли стоимость нескольких товаров."
+    },
+    "input()": {
+        "core": "input() всегда возвращает строку. Если дальше нужен number, его нужно явно преобразовать через int() или float().",
+        "why": "Большинство программ взаимодействует с внешними данными: пользователем, файлом, HTTP-запросом. Преобразование ввода — важная часть обработки данных.",
+        "example": 'age = int(input("Сколько лет? "))\nprint(age + 1)',
+        "breakdown": "input получает текст → int пытается превратить его в целое → результат сохраняется в age → к нему можно применять арифметику.",
+        "mistakes": ["Забыть преобразование строки в число.", "Не учитывать ValueError при плохом вводе.", "Смешивать ввод и бизнес-логику в одной огромной функции."],
+        "practice": "Сделай ввод цены и количества с расчётом итоговой суммы."
+    },
+    "if": {
+        "core": "if выбирает ветку выполнения по булеву условию. Условие должно вычислиться в True или False.",
+        "why": "Условия превращают программу из линейного списка команд в алгоритм, который умеет реагировать на разные ситуации.",
+        "example": 'temperature = 7\nif temperature < 10:\n    print("Нужно взять куртку")\nelse:\n    print("Можно полегче")',
+        "breakdown": "Python вычисляет temperature < 10. Если результат True, выполняется первый блок; иначе — второй.",
+        "mistakes": ["Забыть двоеточие.", "Неверно расставить отступы.", "Использовать = вместо == при сравнении."],
+        "practice": "Напиши проверку пароля: если длина меньше 8 — покажи подсказку, иначе сообщи, что пароль подходит по длине."
+    },
+    "for": {
+        "core": "for перебирает элементы и выполняет тело цикла для каждого значения. Это не только счётчик: цикл работает с любым итерируемым объектом.",
+        "why": "Циклы убирают повторяющийся код и позволяют обрабатывать коллекции, строки, файлы и результаты запросов.",
+        "example": 'names = ["Alex", "Anna", "Max"]\nfor name in names:\n    print(name)',
+        "breakdown": "На каждой итерации name получает очередной элемент списка, затем выполняется тело цикла.",
+        "mistakes": ["Не понимать, какой объект перебирается.", "Изменять коллекцию во время перебора без понимания последствий.", "Делать вложенность глубже, чем нужно."],
+        "practice": "Выведи только слова длиннее пяти символов из списка."
+    },
+    "list": {
+        "core": "list — изменяемая упорядоченная коллекция. Элементы доступны по индексу, а порядок сохраняется.",
+        "why": "Список удобен, когда нужно хранить последовательность: товары корзины, сообщения, результаты, задачи.",
+        "example": 'tasks = ["учёба", "спорт"]\ntasks.append("код")\nprint(tasks[0])',
+        "breakdown": "Создали список → append добавил элемент в конец → индекс 0 дал первый элемент.",
+        "mistakes": ["Использовать index за пределами списка.", "Путать append и extend.", "Случайно менять исходный список через общую ссылку."],
+        "practice": "Создай список оценок, добавь две оценки и посчитай среднее значение."
+    },
+    "dict": {
+        "core": "dict хранит пары ключ → значение. Это структура для быстрого доступа к данным по понятному ключу.",
+        "why": "Словари особенно полезны для объектов с именованными полями: пользователь, товар, настройки, ответ API.",
+        "example": 'user = {"name": "Alex", "age": 14}\nprint(user["name"])\nprint(user.get("city", "не указано"))',
+        "breakdown": "Доступ через [] ожидает существующий ключ, а get позволяет задать значение по умолчанию.",
+        "mistakes": ["Получать отсутствующий ключ через [] без обработки.", "Хранить всё в одном огромном словаре без структуры.", "Не различать keys(), values() и items()."],
+        "practice": "Создай словарь товара с name, price и count и вычисли общую стоимость."
+    },
+    "def": {
+        "core": "Функция encapsulates действие: получает входные данные, выполняет логику и при необходимости возвращает результат.",
+        "why": "Функции уменьшают дублирование и позволяют тестировать части программы отдельно.",
+        "example": 'def area(width, height):\n    return width * height\n\nprint(area(5, 3))',
+        "breakdown": "При вызове area(5, 3) параметры получают значения 5 и 3, тело считает произведение, return отдаёт 15 вызывающему коду.",
+        "mistakes": ["Путать параметры и аргументы.", "Забывать return.", "Делать функцию, которая одновременно читает ввод, пишет в файл и рисует UI без необходимости."],
+        "practice": "Напиши функцию discount(price, percent), возвращающую цену после скидки."
+    },
+    "return": {
+        "core": "return завершает выполнение функции и передаёт значение наружу. Это отличается от print(), который только выводит текст.",
+        "why": "Возвращаемое значение можно сохранить, передать другой функции, протестировать или использовать в выражении.",
+        "example": 'def is_even(n):\n    return n % 2 == 0\n\nprint(is_even(8))',
+        "breakdown": "Функция не печатает ответ сама — она возвращает bool, а вызывающий код решает, что с ним делать.",
+        "mistakes": ["Использовать print вместо return.", "Ожидать значение после return без аргумента — тогда вернётся None.", "Пытаться вернуть несколько несвязанных результатов без структуры."],
+        "practice": "Сделай функцию max_of_three(a, b, c), которая возвращает максимальное число."
+    },
+    "try": {
+        "core": "try/except позволяет обработать ожидаемую ошибку рядом с операцией, которая действительно может завершиться неудачей.",
+        "why": "Внешний ввод, файлы, сети и базы данных могут вернуть неожиданные данные или временно не работать.",
+        "example": 'try:\n    age = int(input("Возраст: "))\nexcept ValueError:\n    print("Нужно ввести целое число")',
+        "breakdown": "Опасный участок находится в try. Если возникает ValueError, управление переходит в соответствующий except.",
+        "mistakes": ["except Exception вокруг всего приложения.", "Скрывать ошибку и продолжать в некорректном состоянии.", "Обрабатывать не тот тип исключения."],
+        "practice": "Сделай безопасный ввод делимого и делителя с отдельной обработкой ValueError и ZeroDivisionError."
+    },
+    "open()": {
+        "core": "open() создаёт файловый объект. Режим r читает, w перезаписывает, a добавляет в конец.",
+        "why": "Файлы позволяют хранить данные между запусками и обмениваться данными с другими программами.",
+        "example": 'with open("notes.txt", "w", encoding="utf-8") as f:\n    f.write("Первая заметка")',
+        "breakdown": "with автоматически закрывает файл после блока, даже если внутри возникнет исключение.",
+        "mistakes": ["Забыть encoding для текстовых файлов.", "Открыть w и случайно стереть файл.", "Оставить файл открытым."],
+        "practice": "Сделай программу, которая добавляет новую заметку в notes.txt и затем выводит все заметки."
+    },
+    "class": {
+        "core": "class описывает новый тип объектов: какие данные они хранят и какие операции над ними поддерживают.",
+        "why": "Классы полезны, когда в программе много однотипных сущностей с общими правилами поведения.",
+        "example": 'class User:\n    def __init__(self, name):\n        self.name = name\n\nuser = User("Alex")',
+        "breakdown": "__init__ получает имя при создании объекта и сохраняет его в self.name. user теперь отдельный экземпляр класса User.",
+        "mistakes": ["Создавать класс для любой двухстрочной задачи.", "Не понимать разницу между классом и экземпляром.", "Помещать в класс глобальное состояние без необходимости."],
+        "practice": "Создай класс BankAccount с balance и методами deposit() и withdraw()."
+    },
+    "async": {
+        "core": "async def объявляет корутину. await позволяет уступить управление event loop до завершения другой операции.",
+        "why": "Это полезно, когда программа много времени проводит в ожидании I/O: HTTP, база, файлы, таймеры.",
+        "example": 'import asyncio\n\nasync def main():\n    await asyncio.sleep(1)\n    print("Готово")\n\nasyncio.run(main())',
+        "breakdown": "sleep не блокирует обычным способом весь event loop: другие задачи могут выполняться, пока эта корутина ожидает.",
+        "mistakes": ["Вызывать coroutine без await.", "Считать async магическим ускорителем любого кода.", "Запускать блокирующий код внутри async без причины."],
+        "practice": "Запусти три async-задачи через asyncio.gather и сравни с последовательным ожиданием."
+    },
+    "SQL": {
+        "core": "SQL описывает операции над реляционными данными: создание структуры, выборку, изменение и удаление записей.",
+        "why": "Почти любое прикладное приложение хранит данные. Умение сформулировать запрос важнее, чем просто помнить синтаксис.",
+        "example": 'SELECT name, age\nFROM users\nWHERE age >= 18\nORDER BY name;',
+        "breakdown": "SELECT выбирает поля, FROM задаёт таблицу, WHERE фильтрует строки, ORDER BY задаёт порядок результата.",
+        "mistakes": ["Делать SELECT * без необходимости.", "Собирать SQL строковой конкатенацией из пользовательского ввода.", "Забывать условие WHERE в UPDATE/DELETE."],
+        "practice": "Напиши запрос, который выводит пользователей старше 18 лет по алфавиту."
+    },
+    "HTTP": {
+        "core": "HTTP — протокол запросов и ответов. Клиент отправляет метод, URL, заголовки и при необходимости тело; сервер отвечает статусом, заголовками и телом.",
+        "why": "Понимание HTTP помогает одинаково уверенно работать с requests, FastAPI, Flask и Telegram Mini App API.",
+        "example": 'GET /users/42 HTTP/1.1\nAccept: application/json',
+        "breakdown": "GET просит ресурс, URL указывает адрес, Accept сообщает предпочитаемый формат ответа.",
+        "mistakes": ["Не проверять HTTP-статус.", "Смешивать GET и POST без понимания семантики.", "Передавать секреты в URL без необходимости."],
+        "practice": "Сделай requests.get(), проверь status_code и только потом прочитай JSON."
+    },
+    "aiogram": {
+        "core": "aiogram разделяет получение обновлений, маршрутизацию обработчиков и бизнес-логику Telegram-бота.",
+        "why": "Когда бот растёт, разделение handlers, данных и сервисов делает код поддерживаемым.",
+        "example": '@dp.message(F.text == "Привет")\nasync def hello(message: Message):\n    await message.answer("Привет!")',
+        "breakdown": "Декоратор связывает событие с функцией. Dispatcher выбирает подходящий handler, функция использует объект Message.",
+        "mistakes": ["Хранить весь проект в одном handler.", "Забывать await у асинхронных операций.", "Не разделять callback_data по смыслу."],
+        "practice": "Сделай handler с двумя кнопками и отдельным обработчиком для каждой callback_data."
+    },
+    "pip": {
+        "core": "pip устанавливает Python-пакеты в текущее окружение. Лучше использовать виртуальное окружение проекта.",
+        "why": "Разные проекты требуют разные версии библиотек; изоляция снижает количество конфликтов.",
+        "example": 'python -m venv .venv\n# Windows: .venv\\Scripts\\activate\n# Linux/macOS: source .venv/bin/activate\npip install requests',
+        "breakdown": "Создаётся отдельное окружение → оно активируется → пакет устанавливается именно туда → зависимости можно зафиксировать.",
+        "mistakes": ["Устанавливать всё глобально.", "Не фиксировать зависимости.", "Не понимать, какой Python и pip сейчас активны."],
+        "practice": "Создай виртуальное окружение и установи в него requests, а затем создай requirements.txt."
+    },
+    "git init": {
+        "core": "git init создаёт локальный репозиторий Git в папке проекта. Дальше Git позволяет фиксировать изменения и работать с ветками.",
+        "why": "Контроль версий нужен, чтобы безопасно менять код, видеть историю и работать с GitHub.",
+        "example": 'git init\ngit add .\ngit commit -m "Initial commit"',
+        "breakdown": "init создаёт репозиторий → add добавляет изменения в staging → commit фиксирует состояние.",
+        "mistakes": ["Коммитить секреты и .env.", "Делать огромные коммиты без понятного сообщения.", "Пушить не ту ветку или не проверять diff."],
+        "practice": "Создай репозиторий для учебного проекта и сделай три небольших осмысленных коммита."
+    },
+}
+
+
+def enrich_lesson(topic: str, base_html: str) -> str:
+    guide = LESSON_GUIDES.get(topic)
+    if not guide:
+        return base_html + (
+            "<hr>"
+            "<h3>🧠 Как закрепить</h3>"
+            "<p>После чтения объяснения измени пример, запусти его и попробуй специально сломать одну строку. Затем исправь её по тексту ошибки.</p>"
+            "<h3>📝 Самопроверка</h3>"
+            "<p>1) Что принимает конструкция? 2) Что она возвращает? 3) В каком случае она выдаст ошибку? 4) Где ты применишь её в проекте?</p>"
+        )
+    mistakes = "".join(f"<li>{html.escape(x)}</li>" for x in guide["mistakes"])
+    return (
+        base_html
+        + "<hr>"
+        + f"<h3>🧠 Глубокое понимание</h3><p>{html.escape(guide['core'])}</p>"
+        + f"<h3>🎯 Зачем это нужно</h3><p>{html.escape(guide['why'])}</p>"
+        + f"<h3>💻 Ещё один пример</h3><pre class=\"code\">{html.escape(guide['example'])}</pre>"
+        + f"<h3>🔍 Разбор по шагам</h3><p>{html.escape(guide['breakdown'])}</p>"
+        + f"<h3>⚠️ Частые ошибки</h3><ul>{mistakes}</ul>"
+        + f"<h3>🧪 Попробуй сам</h3><p>{html.escape(guide['practice'])}</p>"
+        + "<h3>✅ Контрольные вопросы</h3><ol><li>Что является входом?</li><li>Какой результат получается?</li><li>Что произойдёт при неверных данных?</li><li>Как ты изменил бы пример для своего проекта?</li></ol>"
+    )
 
 def get_topic_text(section_number, topic):
 
@@ -1995,10 +2795,10 @@ def get_topic_text(section_number, topic):
     }
 
     if topic in lessons:
-        return lessons[topic]
+        return enrich_lesson(topic, lessons[topic])
 
     if topic in LESSONS_EXTRA:
-        return render_extra_lesson(topic, LESSONS_EXTRA[topic])
+        return enrich_lesson(topic, render_extra_lesson(topic, LESSONS_EXTRA[topic]))
 
     # Подстраховка на случай, если в будущем в COURSE добавят тему,
     # для которой ещё не написан урок.
@@ -2180,9 +2980,11 @@ def _build_course_payload() -> dict:
                 "url": data.get("url", ""),
                 "desc": data["desc"],
                 "commands": data.get("commands", []),
+                "category": data.get("category", "web"),
             }
             for key, data in FRAMEWORKS.items()
         },
+        "framework_groups": grouped_catalog(FRAMEWORKS, FRAMEWORK_CATEGORIES),
         "libraries": {
             key: {
                 "name": data["name"],
@@ -2190,9 +2992,11 @@ def _build_course_payload() -> dict:
                 "url": data.get("url", ""),
                 "desc": data["desc"],
                 "commands": data.get("commands", []),
+                "category": data.get("category", "dev"),
             }
             for key, data in LIBRARIES.items()
         },
+        "library_groups": grouped_catalog(LIBRARIES, LIBRARY_CATEGORIES),
         "mini_codes": MINI_CODES,
         "learning_plan": LEARNING_PLAN,
         "practice_tasks": PRACTICE_TASKS,
@@ -2357,6 +3161,21 @@ async def api_quiz_answer(request: web.Request) -> web.Response:
     }))
 
 
+
+async def api_support(request: web.Request) -> web.Response:
+    user, body = await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error": "invalid initData"}, status=401))
+    text = str(body.get("text", "")).strip()[:4000]
+    if not text:
+        return _cors(web.json_response({"error": "empty message"}, status=400))
+    uid = int(user["id"])
+    username = user.get("username", "")
+    first_name = user.get("first_name", "")
+    ticket_id = await send_support_to_admins(type("WebUser", (), {"id": uid, "username": username, "first_name": first_name})(), text)
+    await log_view(uid, "support", f"ticket:{ticket_id}")
+    return _cors(web.json_response({"ok": True, "ticket_id": ticket_id}))
+
 async def api_tab(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
     if not user or not user.get("id"):
@@ -2453,6 +3272,35 @@ async def api_admin(request: web.Request) -> web.Response:
             return _cors(web.json_response({"error": str(exc)}, status=400))
         return _cors(web.json_response({"ok": True}))
 
+    if action == "support":
+        with db_connect() as conn:
+            rows = conn.execute(
+                "SELECT id,user_id,username,first_name,text,created_at,status FROM support_messages ORDER BY id DESC LIMIT 100"
+            ).fetchall()
+        keys = ["id","user_id","username","first_name","text","created_at","status"]
+        return _cors(web.json_response({"tickets": [dict(zip(keys, r)) for r in rows]}))
+
+    if action == "support_reply":
+        try:
+            ticket_id = int(body.get("ticket_id"))
+        except (TypeError, ValueError):
+            return _cors(web.json_response({"error": "invalid ticket_id"}, status=400))
+        message_text = str(body.get("text", ""))[:4000].strip()
+        if not message_text:
+            return _cors(web.json_response({"error": "empty message"}, status=400))
+        with db_connect() as conn:
+            row = conn.execute("SELECT user_id FROM support_messages WHERE id=?", (ticket_id,)).fetchone()
+        if not row:
+            return _cors(web.json_response({"error": "ticket not found"}, status=404))
+        try:
+            await bot.send_message(int(row[0]), f"🆘 <b>Ответ поддержки</b>\n\n{html.escape(message_text)}", parse_mode="HTML")
+        except Exception as exc:
+            return _cors(web.json_response({"error": str(exc)}, status=400))
+        with db_connect() as conn:
+            conn.execute("UPDATE support_messages SET status='answered' WHERE id=?", (ticket_id,))
+            conn.commit()
+        return _cors(web.json_response({"ok": True}))
+
     return _cors(web.json_response({"error": "unknown action"}, status=400))
 
 
@@ -2465,10 +3313,11 @@ def build_webapp() -> web.Application:
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
     app.router.add_post("/api/progress", api_progress)
     app.router.add_post("/api/tab", api_tab)
+    app.router.add_post("/api/support", api_support)
     app.router.add_post("/api/quiz", api_quiz_answer)
     app.router.add_post("/api/admin", api_admin)
 
-    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/quiz", "/api/admin"):
+    for path in ("/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):
