@@ -150,11 +150,22 @@ APP_VERSION = "12.0.0"
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
 def normalize_miniapp_url(url: str) -> str:
+    """Нормализует URL Mini App и корректно добавляет версию."""
     if not url:
         return ""
-    clean = url.rstrip("/")
-    sep = "&" if "?" in clean else "?"
-    return clean + sep + "v=12" if clean.lower().endswith(".html") else clean + "/index.html?v=12"
+
+    clean = url.strip().rstrip("/")
+    version = f"v={APP_VERSION.split('.')[0]}"
+
+    if clean.lower().endswith(".html"):
+        separator = "&" if "?" in clean else "?"
+        return f"{clean}{separator}{version}"
+
+    if "?" in clean:
+        base, query = clean.split("?", 1)
+        return f"{base}/index.html?{query}&{version}"
+
+    return f"{clean}/index.html?{version}"
 
 MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
 
@@ -173,10 +184,10 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "academy.db")
 
 
 def db_connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    # WAL заметно ускоряет одновременные чтение/запись у Telegram-бота
-    # (несколько апдейтов могут обрабатываться "почти одновременно").
-    conn.execute("PRAGMA journal_mode=WAL")
+    # Собственное соединение для каждого потока безопасно для asyncio.to_thread().
+    # WAL включается один раз в init_db(), а не при каждом подключении.
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute("PRAGMA busy_timeout=10000")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
@@ -184,6 +195,7 @@ def db_connect() -> sqlite3.Connection:
 def init_db():
     """Создаёт таблицы и индексы, если их ещё нет."""
     with db_connect() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id         INTEGER PRIMARY KEY,
@@ -3537,7 +3549,7 @@ def _admin_user_views_sync(user_id: int, limit: int = 50):
     return user, views
 
 
-async def _get_broadcast_user_ids(mode: str) -> list[int]:
+def _get_broadcast_user_ids(mode: str) -> list[int]:
     now = datetime.now()
     if mode == "admins":
         return sorted(ADMIN_IDS)
@@ -3560,8 +3572,6 @@ async def _get_broadcast_user_ids(mode: str) -> list[int]:
 
 async def _perform_broadcast(mode: str, message_text: str) -> tuple[int, int]:
     ids = await asyncio.to_thread(_get_broadcast_user_ids, mode)
-    # _get_broadcast_user_ids is async; get the actual list directly below.
-    ids = await _get_broadcast_user_ids(mode)
     sent = failed = 0
     for uid in ids:
         try:
@@ -3596,7 +3606,6 @@ async def api_admin(request: web.Request) -> web.Response:
         with db_connect() as conn:
             total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             total_views = conn.execute("SELECT COUNT(*) FROM views").fetchone()[0]
-            cutoff_iso = datetime.now().isoformat(timespec="seconds")
         return _cors(web.json_response({
             "users": users,
             "total_users": total_users,
