@@ -150,22 +150,11 @@ APP_VERSION = "12.0.0"
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
 def normalize_miniapp_url(url: str) -> str:
-    """Нормализует URL Mini App и корректно добавляет версию."""
     if not url:
         return ""
-
-    clean = url.strip().rstrip("/")
-    version = f"v={APP_VERSION.split('.')[0]}"
-
-    if clean.lower().endswith(".html"):
-        separator = "&" if "?" in clean else "?"
-        return f"{clean}{separator}{version}"
-
-    if "?" in clean:
-        base, query = clean.split("?", 1)
-        return f"{base}/index.html?{query}&{version}"
-
-    return f"{clean}/index.html?{version}"
+    clean = url.rstrip("/")
+    sep = "&" if "?" in clean else "?"
+    return clean + sep + "v=12" if clean.lower().endswith(".html") else clean + "/index.html?v=12"
 
 MINIAPP_LAUNCH_URL = normalize_miniapp_url(MINIAPP_URL)
 
@@ -184,10 +173,10 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "academy.db")
 
 
 def db_connect() -> sqlite3.Connection:
-    # Собственное соединение для каждого потока безопасно для asyncio.to_thread().
-    # WAL включается один раз в init_db(), а не при каждом подключении.
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.execute("PRAGMA busy_timeout=10000")
+    conn = sqlite3.connect(DB_PATH)
+    # WAL заметно ускоряет одновременные чтение/запись у Telegram-бота
+    # (несколько апдейтов могут обрабатываться "почти одновременно").
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
@@ -195,7 +184,6 @@ def db_connect() -> sqlite3.Connection:
 def init_db():
     """Создаёт таблицы и индексы, если их ещё нет."""
     with db_connect() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id         INTEGER PRIMARY KEY,
@@ -3456,48 +3444,94 @@ async def api_code_check(request: web.Request) -> web.Response:
     return _cors(web.json_response(result))
 
 async def api_mentor(request: web.Request) -> web.Response:
-    user, body = await _read_webapp_user(request)
-    if not user or not user.get("id"):
-        return _cors(web.json_response({"error":"invalid initData"},status=401))
-    query = str(body.get("query","")).strip()[:500]
-    mode = str(body.get("mode","explain")).lower()
-    if not query:
-        return _cors(web.json_response({"answer":"Напиши вопрос про Python, урок, библиотеку или фреймворк.","suggestions":[]}))
-    q_words = [w for w in re.findall(r"[a-zA-Zа-яА-Я0-9_+#.-]{2,}", query.lower())]
-    candidates = []
-    for section_num, section in COURSE.items():
-        for topic in section.get("topics", []):
-            score = sum(1 for w in q_words if w in topic.lower())
+    """Безопасный API наставника. Никогда не роняет aiohttp из-за данных каталога."""
+    try:
+        user, body = await _read_webapp_user(request)
+        if not user or not user.get("id"):
+            return _cors(web.json_response({"error": "invalid initData"}, status=401))
+
+        query = str(body.get("query", "")).strip()[:500]
+        mode = str(body.get("mode", "explain")).strip().lower()
+        if mode not in {"explain", "simple", "analogy"}:
+            mode = "explain"
+
+        if not query:
+            return _cors(web.json_response({
+                "answer": "Напиши вопрос про Python, урок, библиотеку или фреймворк.",
+                "suggestions": []
+            }))
+
+        q_words = re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9_+#.-]{2,}", query.lower())
+        candidates = []
+
+        # Ищем по урокам. Все значения приводим к строке, чтобы
+        # один повреждённый элемент каталога не давал HTTP 500.
+        for section_num, section in COURSE.items():
+            for topic in section.get("topics", []):
+                topic_text = str(topic)
+                score = sum(1 for w in q_words if w in topic_text.lower())
+                if score:
+                    candidates.append((score, "lesson", str(section_num), topic_text))
+
+        # Ищем по фреймворкам. commands могут быть как строками,
+        # так и парами/списками — обрабатываем оба варианта.
+        for key, item in FRAMEWORKS.items():
+            commands = item.get("commands", []) or []
+            command_text = " ".join(
+                str(c[0] if isinstance(c, (list, tuple)) and c else c)
+                for c in commands
+            )
+            txt = f"{item.get('name', '')} {item.get('desc', '')} {command_text}"
+            score = sum(1 for w in q_words if w in txt.lower())
             if score:
-                candidates.append((score,"lesson",str(section_num),topic))
-    for key,item in FRAMEWORKS.items():
-        txt = f"{item.get('name','')} {item.get('desc','')} {' '.join(c[0] for c in item.get('commands',[]))}"
-        score = sum(1 for w in q_words if w in txt.lower())
-        if score:
-            candidates.append((score,"framework",key,item["name"]))
-    for key,item in LIBRARIES.items():
-        txt = f"{item.get('name','')} {item.get('desc','')} {' '.join(c[0] for c in item.get('commands',[]))}"
-        score = sum(1 for w in q_words if w in txt.lower())
-        if score:
-            candidates.append((score,"library",key,item["name"]))
-    candidates.sort(reverse=True)
-    top = candidates[:5]
-    if not top:
-        answer = "Я не нашёл точного совпадения. Попробуй: «циклы», «функции», «Django», «SQLite», «asyncio»."
-    else:
-        title = top[0][3]
-        if mode == "simple":
-            answer = f"Проще: «{title}» — это инструмент или тема, которую лучше сначала понять на одном маленьком примере, а потом закрепить практикой."
-        elif mode == "analogy":
-            answer = f"Аналогия: представь «{title}» как инструмент в наборе разработчика. Сначала определяешь задачу, затем берёшь подходящий инструмент."
+                candidates.append((score, "framework", str(key), str(item.get("name", key))))
+
+        # Ищем по библиотекам.
+        for key, item in LIBRARIES.items():
+            commands = item.get("commands", []) or []
+            command_text = " ".join(
+                str(c[0] if isinstance(c, (list, tuple)) and c else c)
+                for c in commands
+            )
+            txt = f"{item.get('name', '')} {item.get('desc', '')} {command_text}"
+            score = sum(1 for w in q_words if w in txt.lower())
+            if score:
+                candidates.append((score, "library", str(key), str(item.get("name", key))))
+
+        candidates.sort(key=lambda x: (-x[0], x[1], x[3]))
+        top = candidates[:5]
+
+        if not top:
+            answer = "Я не нашёл точного совпадения. Попробуй: «циклы», «функции», «Django», «SQLite», «asyncio»."
         else:
-            extra = LESSONS_EXTRA.get(title)
-            answer = f"По теме «{title}»: {extra[1]}" if extra else f"Начни с «{title}», затем открой связанную практику."
-    await log_view(int(user["id"]), "mentor", query)
-    return _cors(web.json_response({
-        "answer":answer,
-        "suggestions":[{"kind":kind,"key":key,"title":title} for _,kind,key,title in top],
-    }))
+            title = top[0][3]
+            if mode == "simple":
+                answer = f"Проще: «{title}» — это инструмент или тема, которую лучше сначала понять на одном маленьком примере, а потом закрепить практикой."
+            elif mode == "analogy":
+                answer = f"Аналогия: представь «{title}» как инструмент в наборе разработчика. Сначала определяешь задачу, затем берёшь подходящий инструмент."
+            else:
+                extra = LESSONS_EXTRA.get(title)
+                if isinstance(extra, (list, tuple)) and len(extra) > 1:
+                    answer = f"По теме «{title}»: {str(extra[1])}"
+                else:
+                    answer = f"Начни с «{title}», затем открой связанную практику."
+
+        uid = int(user["id"])
+        await log_view(uid, "mentor", query)
+        return _cors(web.json_response({
+            "answer": answer,
+            "suggestions": [
+                {"kind": kind, "key": key, "title": title}
+                for _, kind, key, title in top
+            ]
+        }))
+    except Exception as exc:
+        # Не отдаём HTML-страницу 500: Mini App всегда получает JSON.
+        log.exception("Ошибка /api/mentor")
+        return _cors(web.json_response({
+            "error": "mentor_error",
+            "reason": f"{type(exc).__name__}: {exc}"
+        }, status=500))
 
 async def api_tab(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
@@ -3549,7 +3583,7 @@ def _admin_user_views_sync(user_id: int, limit: int = 50):
     return user, views
 
 
-def _get_broadcast_user_ids(mode: str) -> list[int]:
+async def _get_broadcast_user_ids(mode: str) -> list[int]:
     now = datetime.now()
     if mode == "admins":
         return sorted(ADMIN_IDS)
@@ -3572,6 +3606,8 @@ def _get_broadcast_user_ids(mode: str) -> list[int]:
 
 async def _perform_broadcast(mode: str, message_text: str) -> tuple[int, int]:
     ids = await asyncio.to_thread(_get_broadcast_user_ids, mode)
+    # _get_broadcast_user_ids is async; get the actual list directly below.
+    ids = await _get_broadcast_user_ids(mode)
     sent = failed = 0
     for uid in ids:
         try:
@@ -3606,6 +3642,7 @@ async def api_admin(request: web.Request) -> web.Response:
         with db_connect() as conn:
             total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             total_views = conn.execute("SELECT COUNT(*) FROM views").fetchone()[0]
+            cutoff_iso = datetime.now().isoformat(timespec="seconds")
         return _cors(web.json_response({
             "users": users,
             "total_users": total_users,
