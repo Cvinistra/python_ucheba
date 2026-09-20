@@ -1,12 +1,40 @@
-Python Academy v10.0.0 — cache bust + admin broadcasts + version diagnostics.
+PYTHON ACADEMY v15 — Render
 
-Python Academy v9 — Render
+1) GitHub files:
+   bot_final.py
+   lessons_extra.py
+   requirements.txt
+   webapp/index.html
 
-Environment:
-BOT_TOKEN=...
-ADMIN_ID=...
-ADMIN_IDS=123,456 (optional; comma-separated extra admins)
-MINIAPP_URL=https://your-service.onrender.com/
-WEBAPP_PORT is optional; Render provides PORT automatically.
+2) Render Build Command:
+   pip install -r requirements.txt
 
-Upload bot_final.py, lessons_extra.py, requirements.txt and webapp/index.html to GitHub, commit, then deploy latest commit on Render.
+3) Render Start Command:
+   python bot_final.py
+
+4) Environment variables:
+   BOT_TOKEN=<token from BotFather>
+   ADMIN_ID=<your Telegram ID>
+   MINIAPP_URL=https://YOUR-SERVICE.onrender.com/
+
+   WEBAPP_HOST/WEBAPP_PORT are not required. The app uses Render's PORT.
+
+5) The Mini App UI is served by /index.html and the root routes.
+
+6) New features in v15:
+   - learning roadmap and personal learning goal
+   - home dashboard with resume-last-place
+   - framework/library catalog with categories, commands and related technologies
+   - global search
+   - favorites
+   - practice filters + random task
+   - 4-choice error quiz
+   - safe AST code editor (does not execute user code)
+   - projects
+   - mentor
+   - support tickets
+   - admin users/active users/history/broadcasts/support/analytics
+   - error analysis in progress
+   - language RU/EN
+   - dark/light/system theme
+   - daily reminders with configurable server-local time

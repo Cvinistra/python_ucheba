@@ -147,7 +147,7 @@ def is_admin_user(user_id: int) -> bool:
 # Требования Telegram: адрес обязательно HTTPS (кроме localhost при
 # тестировании через ngrok/аналоги — тогда достаточно https-туннеля).
 
-APP_VERSION = "14.0.0"
+APP_VERSION = "15.0.0"
 MINIAPP_URL = os.getenv("MINIAPP_URL", "").strip()
 
 def normalize_miniapp_url(url: str) -> str:
@@ -242,6 +242,38 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN current_tab TEXT")
         if "current_tab_at" not in existing_cols:
             conn.execute("ALTER TABLE users ADD COLUMN current_tab_at TEXT")
+
+        for col, definition in (
+            ("language", "TEXT DEFAULT 'ru'"),
+            ("theme", "TEXT DEFAULT 'system'"),
+            ("goal", "TEXT DEFAULT 'general'"),
+            ("notifications_enabled", "INTEGER DEFAULT 1"),
+            ("reminder_time", "TEXT DEFAULT '19:00'"),
+            ("resume_enabled", "INTEGER DEFAULT 1"),
+        ):
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS practice_completions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                task_id TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                UNIQUE(user_id, task_id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_practice_user ON practice_completions(user_id)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS code_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                task_id TEXT NOT NULL,
+                passed INTEGER NOT NULL,
+                attempted_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_code_attempts_user ON code_attempts(user_id)")
 
         support_cols = {row[1] for row in conn.execute("PRAGMA table_info(support_messages)")}
         if "reply_text" not in support_cols:
@@ -3108,9 +3140,9 @@ async def api_me(request: web.Request) -> web.Response:
     def _settings():
         with db_connect() as conn:
             return conn.execute(
-                "SELECT language,theme,goal FROM users WHERE user_id=?",
+                "SELECT language,theme,goal,notifications_enabled,reminder_time,resume_enabled FROM users WHERE user_id=?",
                 (uid,),
-            ).fetchone() or ("ru","system","general")
+            ).fetchone() or ("ru","system","general",1,"19:00",1)
     settings = await asyncio.to_thread(_settings)
     return _cors(web.json_response({
         "user": user,
@@ -3119,6 +3151,9 @@ async def api_me(request: web.Request) -> web.Response:
             "language": settings[0] or "ru",
             "theme": settings[1] or "system",
             "goal": settings[2] or "general",
+            "notifications_enabled": bool(settings[3]),
+            "reminder_time": settings[4] or "19:00",
+            "resume_enabled": bool(settings[5]),
         },
     }))
 
@@ -3132,6 +3167,10 @@ async def api_lesson(request: web.Request) -> web.Response:
         return _cors(web.json_response({"error": "not found"}, status=404))
 
     text = get_topic_text(section_number, topic)
+    guide = LESSON_GUIDES.get(topic, {})
+    topics = COURSE[section_number].get("topics", [])
+    prev_lesson = {"section":section_number,"index":topic_index-1,"title":topics[topic_index-1]} if topic_index>0 else None
+    next_lesson = {"section":section_number,"index":topic_index+1,"title":topics[topic_index+1]} if topic_index+1<len(topics) else None
 
     # Уроки из Mini App учитываются в views как topic.
     parsed = validate_init_data(_request_init_data(request), TOKEN)
@@ -3141,7 +3180,7 @@ async def api_lesson(request: web.Request) -> web.Response:
         await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
         await log_view(uid, "topic", f"{section_number}:{topic}")
 
-    return _cors(web.json_response({"topic": topic, "html": text}))
+    return _cors(web.json_response({"topic": topic, "html": text, "guide": guide, "prev": prev_lesson, "next": next_lesson}))
 
 
 async def _read_webapp_user(request: web.Request):
@@ -3155,20 +3194,23 @@ async def _read_webapp_user(request: web.Request):
 
 
 async def api_progress(request: web.Request) -> web.Response:
-    user, _ = await _read_webapp_user(request)
+    user,_=await _read_webapp_user(request)
     if not user or not user.get("id"):
-        return _cors(web.json_response({"error": "invalid initData"}, status=401))
-
-    uid = int(user["id"])
-    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
-    done = await asyncio.to_thread(_count_done_topics_sync, uid)
-    def _quiz_stats_sync():
+        return _cors(web.json_response({"error":"invalid initData"},status=401))
+    uid=int(user["id"])
+    await touch_user_from_webapp(uid,user.get("username","") or "",user.get("first_name","") or "")
+    def _stats():
         with db_connect() as conn:
-            row = conn.execute("SELECT COUNT(*), COALESCE(SUM(correct),0) FROM quiz_attempts WHERE user_id=?", (uid,)).fetchone()
-            return int(row[0]), int(row[1])
-    quiz_total, quiz_correct = await asyncio.to_thread(_quiz_stats_sync)
-    return _cors(web.json_response({"done": done, "total": TOTAL_TOPICS, "quiz_total": quiz_total, "quiz_correct": quiz_correct}))
-
+            done=int(conn.execute("SELECT COUNT(DISTINCT title) FROM views WHERE user_id=? AND kind='topic'",(uid,)).fetchone()[0])
+            qt,qc=conn.execute("SELECT COUNT(*),COALESCE(SUM(correct),0) FROM quiz_attempts WHERE user_id=?",(uid,)).fetchone()
+            td=int(conn.execute("SELECT COUNT(*) FROM practice_completions WHERE user_id=?",(uid,)).fetchone()[0])
+            ct,cp=conn.execute("SELECT COUNT(*),COALESCE(SUM(passed),0) FROM code_attempts WHERE user_id=?",(uid,)).fetchone()
+            bad=conn.execute("SELECT quiz_id,COUNT(*) FROM quiz_attempts WHERE user_id=? AND correct=0 GROUP BY quiz_id ORDER BY COUNT(*) DESC",(uid,)).fetchall()
+        return done,int(qt),int(qc),td,int(ct),int(cp),[(r[0],int(r[1])) for r in bad]
+    done,qt,qc,td,ct,cp,bad=await asyncio.to_thread(_stats)
+    titles={q["id"]:q["title"] for q in QUIZ_QUESTIONS}
+    errors=[{"quiz_id":qid,"title":titles.get(qid,qid),"errors":n} for qid,n in bad]
+    return _cors(web.json_response({"done":done,"total":TOTAL_TOPICS,"quiz_total":qt,"quiz_correct":qc,"tasks_done":td,"code_attempts":ct,"code_passed":cp,"quiz_errors":errors}))
 
 async def _save_quiz_attempt_sync(user_id: int, quiz_id: str, option_index: int, correct: bool):
     now = datetime.now().isoformat(timespec="seconds")
@@ -3355,45 +3397,66 @@ def _check_code_task(task_id: str, code: str) -> dict:
 async def api_settings(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
     if not user or not user.get("id"):
-        return _cors(web.json_response({"error": "invalid initData"}, status=401))
-    uid = int(user["id"])
-    action = str(body.get("action", "get")).strip().lower()
-
-    if action == "get":
+        return _cors(web.json_response({"error":"invalid initData"}, status=401))
+    uid=int(user["id"])
+    action=str(body.get("action","get")).lower()
+    if action=="get":
         def _get():
             with db_connect() as conn:
-                return conn.execute(
-                    "SELECT language,theme,goal,username,first_name FROM users WHERE user_id=?",
-                    (uid,),
-                ).fetchone()
-        row = await asyncio.to_thread(_get)
-        if not row:
-            return _cors(web.json_response({"language":"ru","theme":"system","goal":"general"}))
-        return _cors(web.json_response({
-            "language": row[0] or "ru",
-            "theme": row[1] or "system",
-            "goal": row[2] or "general",
-            "username": row[3] or "",
-            "first_name": row[4] or "",
-        }))
-
-    language = str(body.get("language", "ru")).lower()
-    theme = str(body.get("theme", "system")).lower()
-    goal = str(body.get("goal", "general")).lower()
-    if language not in {"ru", "en"}: language = "ru"
-    if theme not in {"system", "dark", "light"}: theme = "system"
-    await touch_user_from_webapp(uid, user.get("username", ""), user.get("first_name", ""))
-
+                return conn.execute("SELECT language,theme,goal,notifications_enabled,reminder_time,resume_enabled FROM users WHERE user_id=?",(uid,)).fetchone()
+        row=await asyncio.to_thread(_get) or ("ru","system","general",1,"19:00",1)
+        return _cors(web.json_response({"language":row[0] or "ru","theme":row[1] or "system","goal":row[2] or "general","notifications_enabled":bool(row[3]),"reminder_time":row[4] or "19:00","resume_enabled":bool(row[5])}))
+    language=str(body.get("language","ru")).lower()
+    theme=str(body.get("theme","system")).lower()
+    goal=str(body.get("goal","general")).lower()
+    if language not in {"ru","en"}: language="ru"
+    if theme not in {"system","dark","light"}: theme="system"
+    notifications=1 if body.get("notifications_enabled",True) else 0
+    reminder=str(body.get("reminder_time","19:00"))
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d",reminder): reminder="19:00"
+    resume=1 if body.get("resume_enabled",True) else 0
+    await touch_user_from_webapp(uid,user.get("username","") or "",user.get("first_name","") or "")
     def _save():
         with db_connect() as conn:
-            conn.execute(
-                "UPDATE users SET language=?, theme=?, goal=? WHERE user_id=?",
-                (language, theme, goal[:40], uid),
-            )
+            conn.execute("UPDATE users SET language=?,theme=?,goal=?,notifications_enabled=?,reminder_time=?,resume_enabled=? WHERE user_id=?",(language,theme,goal[:40],notifications,reminder,resume,uid))
             conn.commit()
     await asyncio.to_thread(_save)
-    await log_view(uid, "settings", f"{language}:{theme}:{goal}")
-    return _cors(web.json_response({"ok":True,"language":language,"theme":theme,"goal":goal}))
+    await log_view(uid,"settings",f"{language}:{theme}:{goal}")
+    return _cors(web.json_response({"ok":True,"language":language,"theme":theme,"goal":goal,"notifications_enabled":bool(notifications),"reminder_time":reminder,"resume_enabled":bool(resume)}))
+
+async def _home_sync(uid:int):
+    with db_connect() as conn:
+        done=int(conn.execute("SELECT COUNT(DISTINCT title) FROM views WHERE user_id=? AND kind='topic'",(uid,)).fetchone()[0])
+        qt,qc=conn.execute("SELECT COUNT(*),COALESCE(SUM(correct),0) FROM quiz_attempts WHERE user_id=?",(uid,)).fetchone()
+        tasks=int(conn.execute("SELECT COUNT(*) FROM practice_completions WHERE user_id=?",(uid,)).fetchone()[0])
+        favs=int(conn.execute("SELECT COUNT(*) FROM favorites WHERE user_id=?",(uid,)).fetchone()[0])
+        last=conn.execute("SELECT kind,title,viewed_at FROM views WHERE user_id=? ORDER BY id DESC LIMIT 1",(uid,)).fetchone()
+        u=conn.execute("SELECT current_tab,current_tab_at,first_seen,last_seen FROM users WHERE user_id=?",(uid,)).fetchone()
+    return {"done":done,"quiz_total":int(qt),"quiz_correct":int(qc),"tasks_done":tasks,"favorites":favs,"last":({"kind":last[0],"title":last[1],"viewed_at":last[2]} if last else None),"current_tab":u[0] if u else None,"current_tab_at":u[1] if u else None,"first_seen":u[2] if u else None,"last_seen":u[3] if u else None}
+
+async def api_home(request:web.Request)->web.Response:
+    user,_=await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error":"invalid initData"},status=401))
+    uid=int(user["id"])
+    await touch_user_from_webapp(uid,user.get("username","") or "",user.get("first_name","") or "")
+    return _cors(web.json_response({"user":user,"stats":await asyncio.to_thread(_home_sync,uid)}))
+
+async def api_task_complete(request:web.Request)->web.Response:
+    user,body=await _read_webapp_user(request)
+    if not user or not user.get("id"):
+        return _cors(web.json_response({"error":"invalid initData"},status=401))
+    task_id=str(body.get("task_id",""))[:100]
+    if not task_id:
+        return _cors(web.json_response({"error":"task_id required"},status=400))
+    now=datetime.now().isoformat(timespec="seconds")
+    def _save():
+        with db_connect() as conn:
+            conn.execute("INSERT OR IGNORE INTO practice_completions(user_id,task_id,completed_at) VALUES(?,?,?)",(int(user["id"]),task_id,now))
+            conn.commit()
+    await asyncio.to_thread(_save)
+    await log_view(int(user["id"]),"practice",f"completed:{task_id}")
+    return _cors(web.json_response({"ok":True}))
 
 async def api_favorites(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
@@ -3436,12 +3499,15 @@ async def api_code_check(request: web.Request) -> web.Response:
     user, body = await _read_webapp_user(request)
     if not user or not user.get("id"):
         return _cors(web.json_response({"error":"invalid initData"},status=401))
-    result = await asyncio.to_thread(
-        _check_code_task,
-        str(body.get("task_id","")),
-        str(body.get("code",""))[:12000],
-    )
-    await log_view(int(user["id"]), "code_trainer", str(body.get("task_id","")))
+    task_id=str(body.get("task_id",""))
+    result=await asyncio.to_thread(_check_code_task,task_id,str(body.get("code",""))[:12000])
+    now=datetime.now().isoformat(timespec="seconds")
+    def _save():
+        with db_connect() as conn:
+            conn.execute("INSERT INTO code_attempts(user_id,task_id,passed,attempted_at) VALUES(?,?,?,?)",(int(user["id"]),task_id,1 if result.get("passed") else 0,now))
+            conn.commit()
+    await asyncio.to_thread(_save)
+    await log_view(int(user["id"]),"code_trainer",task_id)
     return _cors(web.json_response(result))
 
 async def api_mentor(request: web.Request) -> web.Response:
@@ -3752,6 +3818,8 @@ def build_webapp() -> web.Application:
     app.router.add_get("/api/lesson/{section}/{index}", api_lesson)
     app.router.add_post("/api/progress", api_progress)
     app.router.add_post("/api/tab", api_tab)
+    app.router.add_post("/api/home", api_home)
+    app.router.add_post("/api/task-complete", api_task_complete)
     app.router.add_post("/api/support", api_support)
     app.router.add_post("/api/quiz", api_quiz_answer)
     app.router.add_post("/api/admin", api_admin)
@@ -3760,7 +3828,7 @@ def build_webapp() -> web.Application:
     app.router.add_post("/api/code-check", api_code_check)
     app.router.add_post("/api/mentor", api_mentor)
 
-    for path in ("/api/version", "/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin", "/api/settings", "/api/favorites", "/api/code-check", "/api/mentor"):
+    for path in ("/api/version", "/api/course", "/api/me", "/api/lesson/{section}/{index}", "/api/progress", "/api/tab", "/api/support", "/api/quiz", "/api/admin", "/api/settings", "/api/favorites", "/api/code-check", "/api/mentor", "/api/home", "/api/task-complete"):
         app.router.add_route("OPTIONS", path, api_options)
 
     if os.path.isdir(WEBAPP_DIR):
@@ -3782,6 +3850,24 @@ def build_webapp() -> web.Application:
 # =========================================================
 # ЗАПУСК
 # =========================================================
+
+async def notification_loop():
+    while True:
+        try:
+            now=datetime.now(); current=now.strftime("%H:%M"); day=now.strftime("%Y-%m-%d")
+            def _targets():
+                with db_connect() as conn:
+                    return conn.execute("SELECT user_id FROM users WHERE notifications_enabled=1 AND COALESCE(reminder_time,'19:00')=? AND (last_seen IS NULL OR substr(last_seen,1,10)<?)",(current,day)).fetchall()
+            for (uid,) in await asyncio.to_thread(_targets):
+                try:
+                    await bot.send_message(int(uid),"🐍 Python Academy\n\nНапоминание: продолжить обучение? Открой Mini App и вернись к своему маршруту.")
+                    await log_view(int(uid),"notification","daily_reminder")
+                    await asyncio.sleep(0.03)
+                except Exception:
+                    pass
+        except Exception:
+            log.exception("Ошибка notification_loop")
+        await asyncio.sleep(60)
 
 async def main():
     print("🐍 Python Academy запущен!")
@@ -3812,9 +3898,15 @@ async def main():
         except Exception:
             pass
 
+    reminder_task = asyncio.create_task(notification_loop())
     try:
         await dp.start_polling(bot)
     finally:
+        reminder_task.cancel()
+        try:
+            await reminder_task
+        except asyncio.CancelledError:
+            pass
         await bot.session.close()
         if runner:
             await runner.cleanup()
