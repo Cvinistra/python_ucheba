@@ -118,7 +118,7 @@ body.light .editor{background:#f8fafc;color:#111827}
 <body>
 <div class="app">
   <div class="top">
-    <div class="brand">🐍 Python Academy <span class="badge" id="buildVersion">v12</span></div>
+    <div class="brand">🐍 Python Academy <span class="badge" id="buildVersion">v13</span></div>
     <div class="feature-actions" style="margin:0">
       <button class="icon-btn" id="searchBtn" title="Поиск">🔎</button>
       <button class="icon-btn" id="settingsBtn" title="Настройки">⚙️</button>
@@ -990,8 +990,102 @@ loadApp=async function(){
     }
   }catch(e){console.warn("V12 preferences load:",e.message)}
   v12ApplyTheme(state.settings.theme);
-  applyI18n?.();
+  v13ApplyLanguage();
 };
+
+
+/* ================= V14 RELIABLE LANGUAGE FIX ================= */
+const V14_UI={
+  "Обучение":"Learning","Курс":"Course","Фреймворки":"Frameworks","Библиотеки":"Libraries","Практика":"Practice","Наставник":"Mentor","Прогресс":"Progress","Поддержка":"Support","Настройки":"Settings","Админ":"Admin",
+  "Назад":"Back","Найти":"Search","Системная":"System","Тёмная":"Dark","Светлая":"Light","Язык":"Language","Цель обучения":"Learning goal","Тема":"Theme","Профиль":"Profile","Избранное":"Favorites",
+  "Задания":"Tasks","Викторина":"Quiz","Мини-коды":"Mini-codes","Тренажёр":"Code trainer","Проекты":"Projects","Показать пример":"Show solution","Скопировать":"Copy","Скопировать код":"Copy code","Проверить":"Check","Сбросить":"Reset",
+  "Мои обращения":"My requests","Написать администраторам":"Contact administrators","Ответ администратора":"Administrator reply","Обращений пока нет.":"No requests yet.","Ответа пока нет.":"No reply yet.","Твоя цель":"Your goal","Карта обучения":"Learning roadmap","Дорожная карта":"Roadmap",
+  "Глубокое понимание":"Deep understanding","Зачем это нужно":"Why it matters","Частые ошибки":"Common mistakes","Что сделать самому":"Practice task","Прогресс курса":"Course progress",
+  "Все пользователи":"All users","Только активные":"Active only","История":"History","Написать":"Message","Пользователей нет.":"No users.","Обращений нет.":"No requests.","Текущие вкладки":"Current tabs","Частые действия":"Frequent actions","Аналитика Mini App":"Mini App analytics",
+  "Имя":"Name","Username":"Username","Удалить":"Delete","Сохранить":"Save","Русский":"Russian","Начать":"Start","Завершить":"Finish","Следующий вопрос →":"Next question →",
+  "Отправить обращение":"Send request","Показать пример решения":"Show solution","Скопировать код":"Copy code","Ничего не найдено.":"Nothing found.","Поиск":"Search","Настройки":"Settings",
+  "Объясни проще":"Explain simply","Дай аналогию":"Give an analogy","Ещё пример":"Another example","Перейти в практику":"Go to practice","Найти ошибку":"Find the error"
+};
+const V14_EN_TO_RU=Object.fromEntries(Object.entries(V14_UI).map(([ru,en])=>[en,ru]));
+function v14TranslateExact(value){
+  const lang=state.settings?.language||'ru';
+  const map=lang==='en'?V14_UI:V14_EN_TO_RU;
+  const trimmed=value.trim();
+  if(!trimmed || trimmed.length>160) return value;
+  if(Object.prototype.hasOwnProperty.call(map,trimmed)) return value.replace(trimmed,map[trimmed]);
+  return value;
+}
+let v14Translating=false;
+function v14ApplyLanguage(){
+  if(v14Translating)return;
+  v14Translating=true;
+  try{
+    const lang=state.settings?.language||'ru';
+    document.documentElement.lang=lang;
+    const labels={learn:['Обучение','Learning'],course:['Курс','Course'],frameworks:['Фреймворки','Frameworks'],libraries:['Библиотеки','Libraries'],practice:['Практика','Practice'],mentor:['Наставник','Mentor'],progress:['Прогресс','Progress'],support:['Поддержка','Support'],settings:['Настройки','Settings'],admin:['Админ','Admin']};
+    document.querySelectorAll('.tab').forEach(btn=>{
+      const pair=labels[btn.dataset.tab], node=btn.querySelector('b')?.nextSibling;
+      if(pair&&node) node.nodeValue=' '+(lang==='en'?pair[1]:pair[0]);
+    });
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    nodes.forEach(node=>{
+      if(node.parentElement?.closest('script,style'))return;
+      node.nodeValue=v14TranslateExact(node.nodeValue);
+    });
+    document.querySelectorAll('input,textarea').forEach(el=>{
+      const p=el.placeholder||'';
+      const translated=v14TranslateExact(p);
+      if(translated!==p)el.placeholder=translated;
+    });
+    if($('searchBtn'))$('searchBtn').title=lang==='en'?'Search':'Поиск';
+    if($('settingsBtn'))$('settingsBtn').title=lang==='en'?'Settings':'Настройки';
+  }finally{v14Translating=false}
+}
+
+const v14Observer=new MutationObserver(()=>{
+  if(!v14Translating) requestAnimationFrame(v14ApplyLanguage);
+});
+v14Observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+
+// The previous versions translated before newly-rendered content was inserted.
+// Settings now explicitly applies the selected language after each render.
+const v14OldSettings=typeof v12Settings==='function'?v12Settings:null;
+v12Settings=async function(){
+  if(!v14OldSettings)return;
+  await v14OldSettings();
+  requestAnimationFrame(v14ApplyLanguage);
+};
+const v14OldSave=typeof v12SavePrefs==='function'?v12SavePrefs:null;
+v12SavePrefs=async function(){
+  state.settings=Object.assign({language:'ru',theme:'system',goal:'general'},state.settings||{});
+  localStorage.setItem('pyacademy_settings',JSON.stringify(state.settings));
+  v12ApplyTheme?.(state.settings.theme);
+  try{
+    await api('/api/settings',{method:'POST',body:JSON.stringify({initData:tg?.initData||'',...state.settings})});
+  }catch(e){console.warn('settings save:',e.message)}
+  v14ApplyLanguage();
+};
+
+v14ApplyLanguage();
+
+// V14 navigation is bound once here.
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  const key=b.dataset.tab;
+  if(key==='learn')learningHome();
+  else if(key==='course')courseHome();
+  else if(key==='frameworks')catalogHome('framework');
+  else if(key==='libraries')catalogHome('library');
+  else if(key==='practice')practiceHome('tasks');
+  else if(key==='mentor')v12Mentor();
+  else if(key==='progress')progressHome();
+  else if(key==='support')supportHome();
+  else if(key==='settings')v12Settings();
+  else if(key==='admin'&&state.isAdmin)adminHome();
+});
+if($('searchBtn'))$('searchBtn').onclick=()=>v12Search?.();
+if($('settingsBtn'))$('settingsBtn').onclick=()=>v12Settings();
+v14ApplyLanguage();
 
 loadApp();
 </script>
